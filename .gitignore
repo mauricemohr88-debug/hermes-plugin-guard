@@ -1,0 +1,40 @@
+# Bytecode and caches
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.hypothesis/
+
+# Environments
+.venv/
+venv/
+env/
+.env
+.env.*
+!.env.example
+
+# Packaging
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Coverage and test reports
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+junit.xml
+
+# Scanner output
+*.sarif
+hpg.json
+
+# Editors and operating systems
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*~

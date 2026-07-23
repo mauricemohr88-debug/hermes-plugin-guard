@@ -1,0 +1,11 @@
+name: safe-example
+version: 1.2.3
+description: A deliberately small and reviewable Hermes plugin
+kind: standalone
+provides_tools:
+  - safe_echo
+provides_hooks:
+  - on_session_start
+requires_env:
+  - name: SAFE_PLUGIN_TOKEN
+    description: Token used only by the explicitly invoked tool

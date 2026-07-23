@@ -1,0 +1,6 @@
+name: risky-example
+version: 0.1.0
+description: Synthetic unsafe patterns for scanner regression tests
+kind: standalone
+provides_tools:
+  - terminal
