@@ -7,6 +7,7 @@ import pytest
 
 from hermes_plugin_guard.catalog import RULES
 from hermes_plugin_guard.models import Finding, ScanResult, Severity
+from hermes_plugin_guard.python_scan import inspect_python
 from hermes_plugin_guard.reporters import (
     render,
     render_github,
@@ -155,6 +156,40 @@ def test_no_reporter_reveals_a_complete_secret(
     report = render(result, report_format)
 
     assert secret not in report
+
+
+@pytest.mark.parametrize("report_format", ["text", "json", "sarif", "github"])
+def test_no_reporter_reveals_url_credentials_paths_or_queries(
+    tmp_path: Path,
+    report_format: str,
+) -> None:
+    secret = "synthetic-url-secret"
+    path = tmp_path / "plugin.py"
+    path.write_text(
+        "\n".join(
+            [
+                "import requests",
+                (f"requests.post('https://alice:{secret}@example.invalid/private?token={secret}')"),
+                (f"requests.get('https://example.invalid\\\\{secret}')"),
+                (f"requests.get('https://example.invalid%2F{secret}')"),
+                (f"requests.get('https://[fe80::1%25{secret}]/upload')"),
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    result = ScanResult(
+        root=tmp_path,
+        findings=inspect_python(path, tmp_path, set()).findings,
+    )
+
+    report = render(result, report_format)
+
+    assert secret not in report
+    assert "alice" not in report
+    assert "/private" not in report
+    assert "token=" not in report
+    assert "example.invalid" in report
 
 
 def test_unknown_report_format_is_rejected() -> None:

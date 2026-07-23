@@ -160,6 +160,17 @@ RULES: dict[str, Rule] = {
         Severity.HIGH,
         "python",
     ),
+    "HPG112": _rule(
+        "HPG112",
+        "Outbound network egress",
+        "A concrete outbound connection or request can send plugin or user data off-device.",
+        (
+            "Document and constrain destinations, send only required data, use encrypted "
+            "transport, and make network access visible to users."
+        ),
+        Severity.MEDIUM,
+        "python",
+    ),
     "HPG201": _rule(
         "HPG201",
         "Secret material committed",

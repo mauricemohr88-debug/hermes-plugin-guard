@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import socket
 from pathlib import Path
 
 import pytest
@@ -32,6 +33,7 @@ def test_risky_fixture_exercises_critical_and_high_rules(risky_plugin: Path) -> 
         "HPG109",
         "HPG110",
         "HPG111",
+        "HPG112",
         "HPG201",
         "HPG202",
         "HPG203",
@@ -56,6 +58,22 @@ def test_scan_never_imports_or_executes_target_code(risky_plugin: Path) -> None:
     scan(risky_plugin)
 
     assert not marker.exists()
+
+
+def test_scan_never_uses_network(
+    risky_plugin: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def network_forbidden(*args: object, **kwargs: object) -> None:
+        raise AssertionError("scanner attempted network access")
+
+    monkeypatch.setattr(socket, "create_connection", network_forbidden)
+    monkeypatch.setattr(socket, "getaddrinfo", network_forbidden)
+    monkeypatch.setattr(socket, "socket", network_forbidden)
+
+    result = scan(risky_plugin)
+
+    assert "HPG112" in {finding.rule_id for finding in result.findings}
 
 
 def test_scanner_does_not_follow_file_symlinks_outside_root(tmp_path: Path) -> None:

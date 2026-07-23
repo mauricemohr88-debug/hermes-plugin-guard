@@ -66,7 +66,8 @@ The scanner is designed to make high-risk patterns visible, including:
 - direct subprocess calls that bypass Hermes' terminal-tool approval path;
 - dynamic execution and unsafe deserialization;
 - sensitive-path access, destructive filesystem operations, and disabled TLS verification;
-- all-interface listeners, networking capability, and undeclared secret environment variables;
+- all-interface listeners, networking capability, concrete outbound calls with redacted
+  destinations, and undeclared secret environment variables;
 - privileged registration surfaces and work performed during import or registration;
 - likely committed credentials and mutable remote dependencies;
 - manifest drift, missing tests, and missing project policies.
@@ -194,11 +195,24 @@ instead of a moving tag.
 | IDs | Area | Examples |
 | --- | --- | --- |
 | `HPG001`–`HPG006` | Manifest | Missing or invalid manifest, unknown kind, entry point and hook drift |
-| `HPG101`–`HPG111` | Python | Execution, deserialization, processes, sensitive paths, network and privileged behavior |
+| `HPG101`–`HPG112` | Python | Execution, deserialization, processes, sensitive paths, network and privileged behavior |
 | `HPG201`–`HPG203` | Supply chain | Likely secrets, mutable remote dependencies, unbounded versions |
 | `HPG301`–`HPG303` | Project | License, security policy, and automated tests |
 
 Run `hpg rules` for the current severity, explanation, and suggested remediation for every rule.
+
+### Network-egress inventory
+
+`HPG106` reports that a plugin imports a network-capable module. `HPG112` is more specific: it
+reports a concrete outbound request or connection and records the statically visible destination.
+The scanner never resolves DNS or makes a request while doing this.
+
+Destination evidence is deliberately limited to the scheme, hostname, and port. User information,
+paths, query strings, fragments, headers, and payloads are never copied into a finding. Dynamic or
+relative destinations are reported as `<dynamic destination>`. Loopback calls default to low,
+encrypted external calls to medium, and explicitly cleartext HTTP, FTP, WebSocket, or gRPC and
+link-local/cloud-metadata targets to high. Raw TCP and SMTP stay medium because the protocol may
+upgrade to TLS after connecting.
 
 ## Threat model
 
@@ -215,6 +229,9 @@ maintainer history before installation.
 
 - Static analysis cannot reliably resolve dynamically constructed names, paths, commands, or
   network destinations.
+- Egress checks cover common Python HTTP, WebSocket, socket, FTP, SMTP, and gRPC APIs. Calls hidden
+  behind dependencies, arbitrary SDK wrappers, native extensions, or dashboard JavaScript can
+  require manual review.
 - A finding describes a risky capability or pattern, not necessarily a vulnerability.
 - The absence of findings does not establish safety.
 - Secret matching is heuristic and may produce false positives or miss encoded or split secrets.

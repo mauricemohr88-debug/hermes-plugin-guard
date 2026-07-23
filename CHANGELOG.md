@@ -7,6 +7,13 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- `HPG112` inventories concrete outbound Python network calls without executing code, resolving
+  DNS, or making requests.
+- Destination-aware findings redact credentials, paths, queries, fragments, headers, and payloads,
+  and distinguish loopback, encrypted, cleartext, and link-local/cloud-metadata targets.
+
 ## [0.1.1] - 2026-07-23
 
 ### Added
