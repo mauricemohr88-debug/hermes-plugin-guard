@@ -16,6 +16,45 @@ basic repository hygiene. Target plugin code is read as data: it is never import
 This is an unofficial community project. It is not affiliated with, endorsed by, or maintained
 by Nous Research.
 
+![20-second terminal demo of installing and running Hermes Plugin Guard](https://raw.githubusercontent.com/mauricemohr88-debug/hermes-plugin-guard/v0.1.1/docs/demo.gif)
+
+## Five-minute beta test
+
+If you maintain or use a Hermes plugin, one local scan is enough to help improve the rules.
+Python 3.11 or newer and [pipx](https://pipx.pypa.io/stable/) are required.
+
+1. Install the v0.1.1 release directly from GitHub:
+
+   ```bash
+   pipx install \
+     "git+https://github.com/mauricemohr88-debug/hermes-plugin-guard.git@v0.1.1"
+   ```
+
+2. Scan your plugin without failing the command on findings:
+
+   ```bash
+   hpg scan /absolute/path/to/your-plugin --fail-on none
+   ```
+
+3. Send a short
+   [beta-test report](https://github.com/mauricemohr88-debug/hermes-plugin-guard/issues/new?template=beta-test.yml)
+   with the rule IDs that were useful, noisy, or missing. A public plugin URL is helpful but not
+   required.
+
+The scan stays on your computer. `hpg` reads target files as data, does not import or execute
+target plugin code, makes no network requests, includes no telemetry, and uploads neither source
+code nor results. Do not paste private code, credentials, or unsanitized paths into a public issue.
+
+Once v0.1.1 is visible on
+[PyPI](https://pypi.org/project/hermes-plugin-guard/), the shorter installation command is:
+
+```bash
+pipx install hermes-plugin-guard
+```
+
+Already installed? Use `pipx upgrade hermes-plugin-guard` for a PyPI installation, or reinstall
+the tagged GitHub URL above.
+
 ## Why this exists
 
 Hermes plugins are Python extensions, not isolated data files. A third-party plugin can register
@@ -41,7 +80,14 @@ Install the current release directly from GitHub with
 
 ```bash
 pipx install \
-  "git+https://github.com/mauricemohr88-debug/hermes-plugin-guard.git@v0.1.0"
+  "git+https://github.com/mauricemohr88-debug/hermes-plugin-guard.git@v0.1.1"
+```
+
+After the release is published to
+[PyPI](https://pypi.org/project/hermes-plugin-guard/), install it by package name:
+
+```bash
+pipx install hermes-plugin-guard
 ```
 
 Or install from a local checkout:
@@ -130,8 +176,10 @@ jobs:
   guard:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - uses: mauricemohr88-debug/hermes-plugin-guard@v0.1.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: mauricemohr88-debug/hermes-plugin-guard@v0.1.1
         with:
           path: path/to/plugin
           fail-on: high

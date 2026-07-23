@@ -105,3 +105,46 @@ def test_missing_manifest_is_high_severity(tmp_path: Path) -> None:
 
     assert metadata.valid is False
     assert [(item.rule_id, item.severity.label) for item in findings] == [("HPG001", "high")]
+
+
+def test_dashboard_manifest_is_a_valid_manifest_without_python_entry_point(
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / "dashboard-plugin"
+    dashboard = root / "dashboard"
+    dashboard.mkdir(parents=True)
+    (dashboard / "manifest.json").write_text(
+        (
+            '{"name":"sample","version":"1.2.3",'
+            '"description":"A dashboard extension","entry":"dist/index.js"}\n'
+        ),
+        encoding="utf-8",
+    )
+
+    metadata, findings = inspect_manifest(root, root)
+
+    assert findings == []
+    assert metadata.valid is True
+    assert metadata.kind == "dashboard"
+    assert metadata.name == "sample"
+    assert metadata.version == "1.2.3"
+
+
+def test_invalid_dashboard_manifest_is_reported_as_structural_error(
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / "dashboard-plugin"
+    dashboard = root / "dashboard"
+    dashboard.mkdir(parents=True)
+    (dashboard / "manifest.json").write_text(
+        '{"name":"first","name":"duplicate"}\n',
+        encoding="utf-8",
+    )
+
+    metadata, findings = inspect_manifest(root, root)
+
+    assert metadata.valid is False
+    assert len(findings) == 1
+    assert findings[0].rule_id == "HPG002"
+    assert findings[0].path == "dashboard/manifest.json"
+    assert "duplicate key" in findings[0].message
