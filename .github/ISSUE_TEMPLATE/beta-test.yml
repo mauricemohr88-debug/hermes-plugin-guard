@@ -1,0 +1,96 @@
+name: Beta-test feedback
+description: Share one Hermes Plugin Guard test run, including false positives or missed risks.
+title: "[Beta feedback] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for testing Hermes Plugin Guard. A short report is useful even when the scan
+        found nothing.
+
+        The scanner runs locally and does not upload your plugin or report. This issue is public:
+        never include credentials, private source code, personal data, or unsanitized private
+        paths.
+
+  - type: input
+    id: version
+    attributes:
+      label: Hermes Plugin Guard version
+      description: Run `hpg --version` and paste the result.
+      placeholder: hermes-plugin-guard 0.1.1
+    validations:
+      required: true
+
+  - type: input
+    id: environment
+    attributes:
+      label: Test environment
+      description: Include your operating system and Python version.
+      placeholder: macOS 15, Python 3.13
+    validations:
+      required: true
+
+  - type: dropdown
+    id: installation
+    attributes:
+      label: Installation method
+      options:
+        - PyPI with pipx
+        - GitHub tag with pipx
+        - Local checkout
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: plugin
+    attributes:
+      label: Plugin or repository
+      description: Link a public plugin, or describe the private plugin layout without sharing code.
+      placeholder: https://github.com/example/plugin or "private single-plugin directory"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: outcome
+    attributes:
+      label: Overall result
+      options:
+        - The scan worked and the findings looked accurate
+        - The scan worked but produced a likely false positive
+        - The scan worked but missed a risk I expected it to find
+        - Installation or scanning failed
+    validations:
+      required: true
+
+  - type: textarea
+    id: useful
+    attributes:
+      label: What was useful?
+      description: Mention useful rule IDs and why they helped.
+      placeholder: HPG___ correctly highlighted...
+
+  - type: textarea
+    id: problems
+    attributes:
+      label: What was noisy, missing, or broken?
+      description: |
+        Include rule IDs and a minimal, sanitized explanation. For an error, include the exact
+        command and sanitized error text. Do not attach private source code.
+      placeholder: HPG___ reported... but this is expected because...
+    validations:
+      required: true
+
+  - type: textarea
+    id: suggestion
+    attributes:
+      label: One improvement you would prioritize
+      placeholder: I would make...
+
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Public-report safety
+      options:
+        - label: I removed credentials, personal data, private source code, and sensitive paths.
+          required: true

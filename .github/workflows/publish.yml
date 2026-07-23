@@ -1,0 +1,129 @@
+name: Publish to PyPI
+
+on:
+  release:
+    types:
+      - published
+
+permissions: {}
+
+concurrency:
+  group: publish-${{ github.event.release.tag_name }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build and verify distributions
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Check out the released tag
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.release.tag_name }}
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+
+      - name: Verify release tag and package versions
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          python - <<'PY'
+          import ast
+          import os
+          import tomllib
+          from pathlib import Path
+
+          project_version = tomllib.loads(
+              Path("pyproject.toml").read_text(encoding="utf-8")
+          )["project"]["version"]
+          expected_tag = f"v{project_version}"
+          release_tag = os.environ["RELEASE_TAG"]
+          if release_tag != expected_tag:
+              raise SystemExit(
+                  f"release tag {release_tag!r} does not match project version "
+                  f"{project_version!r} (expected {expected_tag!r})"
+              )
+
+          tree = ast.parse(
+              Path("src/hermes_plugin_guard/__init__.py").read_text(encoding="utf-8")
+          )
+          module_version = None
+          for node in tree.body:
+              if (
+                  isinstance(node, ast.Assign)
+                  and any(
+                      isinstance(target, ast.Name) and target.id == "__version__"
+                      for target in node.targets
+                  )
+                  and isinstance(node.value, ast.Constant)
+                  and isinstance(node.value.value, str)
+              ):
+                  module_version = node.value.value
+                  break
+          if module_version != project_version:
+              raise SystemExit(
+                  f"module version {module_version!r} does not match project version "
+                  f"{project_version!r}"
+              )
+          PY
+
+      - name: Install release checks
+        run: >-
+          python -m pip install
+          --disable-pip-version-check
+          -e ".[dev]"
+          "twine>=6,<7"
+
+      - name: Lint
+        run: ruff check .
+
+      - name: Check formatting
+        run: ruff format --check .
+
+      - name: Test
+        run: pytest
+
+      - name: Build wheel and source distribution
+        run: python -m build
+
+      - name: Check distribution metadata
+        run: python -m twine check dist/*
+
+      - name: Store distributions
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: python-package-distributions
+          path: dist/
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    name: Publish distributions
+    if: vars.PYPI_PUBLISH == 'true'
+    needs:
+      - build
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/hermes-plugin-guard
+    permissions:
+      id-token: write # Required for PyPI Trusted Publishing via OIDC.
+
+    steps:
+      - name: Retrieve distributions
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: python-package-distributions
+          path: dist/
+
+      - name: Publish distributions with attestations
+        uses: pypa/gh-action-pypi-publish@ba38be9e461d3875417946c167d0b5f3d385a247 # v1.14.1
+        with:
+          attestations: true

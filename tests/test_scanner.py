@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
 from conftest import make_clean_plugin
 
 from hermes_plugin_guard import scan
@@ -11,7 +12,7 @@ def test_safe_fixture_has_no_findings(safe_plugin: Path) -> None:
     result = scan(safe_plugin)
 
     assert result.plugin_count == 1
-    assert result.scanned_files >= 5
+    assert result.scanned_files >= 4
     assert result.skipped_files == 0
     assert result.findings == []
 
@@ -107,3 +108,118 @@ def test_plugin_yml_compatibility_trap_is_reported(tmp_path: Path) -> None:
     assert result.plugin_count == 1
     assert len(manifest_findings) == 1
     assert "plugin.yml exists" in manifest_findings[0].message
+
+
+@pytest.mark.parametrize(
+    "directory",
+    [
+        "tests",
+        "test",
+        "fixtures",
+        "fixture",
+        "testdata",
+        "test_data",
+        "cache",
+        ".cache",
+        "venv",
+        ".venv",
+        "generated",
+    ],
+)
+def test_non_production_directories_are_not_behavior_or_secret_scanned(
+    tmp_path: Path,
+    directory: str,
+) -> None:
+    plugin = make_clean_plugin(tmp_path / "plugin")
+    risky_source = "\n".join(
+        [
+            "import subprocess",
+            'TOKEN = "sk-' + ("A" * 32) + '"',
+            "subprocess.run(['echo', 'review-me'])",
+            "",
+        ]
+    )
+    (plugin / "runtime.py").write_text(risky_source, encoding="utf-8")
+    ignored = plugin / directory
+    ignored.mkdir(exist_ok=True)
+    (ignored / "fixture.py").write_text(risky_source, encoding="utf-8")
+
+    result = scan(plugin)
+    security_findings = [
+        finding for finding in result.findings if finding.rule_id in {"HPG103", "HPG201"}
+    ]
+
+    assert {(finding.rule_id, finding.path) for finding in security_findings} == {
+        ("HPG103", "runtime.py"),
+        ("HPG201", "runtime.py"),
+    }
+
+
+def test_nested_src_layout_is_discovered_without_root_manifest(tmp_path: Path) -> None:
+    repository = tmp_path / "repository"
+    make_clean_plugin(repository / "src" / "example_plugin")
+    (repository / "LICENSE").write_text("Example license\n", encoding="utf-8")
+    (repository / "SECURITY.md").write_text("Example policy\n", encoding="utf-8")
+
+    result = scan(repository)
+
+    assert result.plugin_count == 1
+    assert "HPG001" not in {finding.rule_id for finding in result.findings}
+    assert result.findings == []
+
+
+def test_known_category_layouts_and_fixture_manifests_are_bounded(
+    tmp_path: Path,
+) -> None:
+    repository = tmp_path / "repository"
+    make_clean_plugin(repository / "plugins" / "model-providers" / "provider")
+    make_clean_plugin(repository / ".hermes" / "plugins" / "platforms" / "channel")
+    make_clean_plugin(repository / "fixtures" / "not-a-production-plugin")
+    make_clean_plugin(repository / "one" / "two" / "three" / "four" / "too-deep")
+    (repository / "LICENSE").write_text("Example license\n", encoding="utf-8")
+    (repository / "SECURITY.md").write_text("Example policy\n", encoding="utf-8")
+
+    result = scan(repository)
+
+    assert result.plugin_count == 2
+    assert not any(
+        finding.path.startswith(("fixtures/", "one/two/three/four/")) for finding in result.findings
+    )
+
+
+def test_dashboard_only_plugin_uses_its_official_manifest(tmp_path: Path) -> None:
+    plugin = tmp_path / "example-dashboard"
+    dashboard = plugin / "dashboard"
+    dashboard.mkdir(parents=True)
+    (dashboard / "manifest.json").write_text(
+        "\n".join(
+            [
+                "{",
+                '  "name": "example",',
+                '  "version": "1.0.0",',
+                '  "description": "Example dashboard plugin",',
+                '  "entry": "dist/index.js",',
+                '  "api": "plugin_api.py"',
+                "}",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    (dashboard / "plugin_api.py").write_text(
+        "def build_router():\n    return None\n",
+        encoding="utf-8",
+    )
+    (plugin / "LICENSE").write_text("Example license\n", encoding="utf-8")
+    (plugin / "SECURITY.md").write_text("Example policy\n", encoding="utf-8")
+    (plugin / "tests").mkdir()
+    (plugin / "tests" / "test_dashboard.py").write_text(
+        "def test_dashboard():\n    pass\n",
+        encoding="utf-8",
+    )
+
+    result = scan(plugin)
+
+    assert result.plugin_count == 1
+    assert {"HPG001", "HPG005"}.isdisjoint(finding.rule_id for finding in result.findings)
+    assert result.findings == []

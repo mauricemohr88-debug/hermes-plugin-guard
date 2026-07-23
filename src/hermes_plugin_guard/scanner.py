@@ -13,20 +13,35 @@ from .python_scan import inspect_python
 from .secret_scan import MAX_TEXT_BYTES, inspect_file
 
 IGNORED_DIRECTORIES = {
+    ".cache",
+    ".eggs",
     ".git",
     ".hg",
     ".mypy_cache",
+    ".nox",
     ".pytest_cache",
     ".ruff_cache",
     ".tox",
     ".venv",
+    ".virtualenv",
     "__pycache__",
     "build",
+    "cache",
+    "caches",
     "dist",
+    "env",
+    "fixture",
+    "fixtures",
+    "generated",
     "node_modules",
+    "test",
+    "test_data",
+    "testdata",
+    "tests",
     "venv",
+    "virtualenv",
 }
-IGNORED_DISCOVERY_PARTS = {"fixtures", "testdata"}
+MAX_PLUGIN_ROOT_DEPTH = 4
 
 
 def scan(
@@ -91,19 +106,45 @@ def scan(
 
 
 def _discover_plugin_roots(root: Path) -> list[Path]:
-    if (root / "plugin.yaml").is_file() or (root / "plugin.yml").is_file():
+    if _has_plugin_marker(root):
         return [root]
 
     roots: set[Path] = set()
-    manifests = list(root.rglob("plugin.yaml")) + list(root.rglob("plugin.yml"))
-    for manifest in sorted(manifests):
-        relative_parts = manifest.relative_to(root).parts
-        if len(relative_parts) > 5:
+    pending: list[tuple[Path, int]] = [(root, 0)]
+    while pending:
+        directory, depth = pending.pop()
+        if directory != root and _has_plugin_marker(directory):
+            roots.add(directory)
+            # A discovered plugin is a scan boundary. Do not treat manifests
+            # inside its fixtures, vendored code, or generated output as
+            # additional plugins.
             continue
-        if _ignored_parts(relative_parts):
+        if depth >= MAX_PLUGIN_ROOT_DEPTH:
             continue
-        roots.add(manifest.parent)
+
+        try:
+            children = sorted(directory.iterdir(), key=lambda path: path.name)
+        except OSError:
+            continue
+        for child in reversed(children):
+            if child.is_symlink():
+                continue
+            try:
+                is_directory = child.is_dir()
+            except OSError:
+                continue
+            if not is_directory or _ignored_parts((child.name,)):
+                continue
+            pending.append((child, depth + 1))
     return sorted(roots)
+
+
+def _has_plugin_marker(root: Path) -> bool:
+    return (
+        (root / "plugin.yaml").is_file()
+        or (root / "plugin.yml").is_file()
+        or (root / "dashboard" / "manifest.json").is_file()
+    )
 
 
 def _iter_files(root: Path) -> Iterable[Path]:
@@ -120,9 +161,7 @@ def _iter_files(root: Path) -> Iterable[Path]:
 
 
 def _ignored_parts(parts: tuple[str, ...]) -> bool:
-    if any(part in IGNORED_DIRECTORIES for part in parts):
-        return True
-    return "tests" in parts and any(part in IGNORED_DISCOVERY_PARTS for part in parts)
+    return any(part.casefold() in IGNORED_DIRECTORIES for part in parts)
 
 
 def _symlink_findings(plugin_root: Path, repository_root: Path) -> list[Finding]:

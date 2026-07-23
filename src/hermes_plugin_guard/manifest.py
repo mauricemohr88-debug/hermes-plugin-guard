@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -39,6 +40,7 @@ SEMVER_RE = re.compile(
     r"(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$"
 )
 MAX_MANIFEST_BYTES = 256_000
+DASHBOARD_MANIFEST = Path("dashboard") / "manifest.json"
 
 
 class _UniqueKeySafeLoader(yaml.SafeLoader):
@@ -130,12 +132,14 @@ def inspect_manifest(
 
     if not manifest_path.is_file():
         alternate = plugin_root / "plugin.yml"
-        detail = (
-            " Only plugin.yml exists; use plugin.yaml because Hermes installer paths "
-            "do not consistently accept the .yml spelling."
-            if alternate.is_file()
-            else ""
-        )
+        if not alternate.is_file() and (plugin_root / DASHBOARD_MANIFEST).is_file():
+            return _inspect_dashboard_manifest(plugin_root, repository_root)
+        detail = ""
+        if alternate.is_file():
+            detail = (
+                " Only plugin.yml exists; use plugin.yaml because Hermes installer paths "
+                "do not consistently accept the .yml spelling."
+            )
         findings.append(
             _finding(
                 "HPG001",
@@ -241,6 +245,112 @@ def inspect_manifest(
 
     metadata.valid = not any(finding.rule_id in {"HPG001", "HPG002"} for finding in findings)
     return metadata, findings
+
+
+def _inspect_dashboard_manifest(
+    plugin_root: Path,
+    repository_root: Path,
+) -> tuple[PluginMetadata, list[Finding]]:
+    """Inspect Hermes' dashboard-only plugin shape.
+
+    Dashboard extensions are discovered from ``dashboard/manifest.json`` and
+    legitimately do not need ``plugin.yaml`` or a package-level
+    ``__init__.py``.
+    """
+
+    manifest_path = plugin_root / DASHBOARD_MANIFEST
+    relative = _relative(manifest_path, repository_root)
+    metadata = PluginMetadata(root=plugin_root, kind="dashboard")
+    findings: list[Finding] = []
+
+    try:
+        if manifest_path.stat().st_size > MAX_MANIFEST_BYTES:
+            findings.append(
+                _finding(
+                    "HPG002",
+                    (
+                        "dashboard/manifest.json exceeds the "
+                        f"{MAX_MANIFEST_BYTES // 1000} KB safety limit."
+                    ),
+                    relative,
+                )
+            )
+            return metadata, findings
+        text = manifest_path.read_text(encoding="utf-8")
+    except (OSError, UnicodeError) as exc:
+        findings.append(
+            _finding(
+                "HPG002",
+                f"dashboard/manifest.json could not be read: {exc}",
+                relative,
+            )
+        )
+        return metadata, findings
+
+    try:
+        data = json.loads(text, object_pairs_hook=_construct_unique_json_mapping)
+    except (json.JSONDecodeError, TypeError, ValueError, RecursionError) as exc:
+        line = getattr(exc, "lineno", 1)
+        findings.append(
+            _finding(
+                "HPG002",
+                f"dashboard/manifest.json contains invalid JSON: {exc}",
+                relative,
+                line,
+            )
+        )
+        return metadata, findings
+
+    if not isinstance(data, dict):
+        findings.append(
+            _finding(
+                "HPG002",
+                "dashboard/manifest.json must contain an object at its root.",
+                relative,
+            )
+        )
+        return metadata, findings
+
+    for key in ("name", "version", "description"):
+        value = data.get(key)
+        if not isinstance(value, str) or not value.strip():
+            findings.append(
+                _finding(
+                    "HPG003",
+                    f"Required dashboard manifest field {key!r} is missing or empty.",
+                    relative,
+                    _line_for_json_key(text, key),
+                )
+            )
+
+    metadata.name = str(data.get("name") or "").strip()
+    metadata.version = str(data.get("version") or "").strip()
+    if metadata.version and not SEMVER_RE.fullmatch(metadata.version):
+        findings.append(
+            _finding(
+                "HPG003",
+                (f"Version {metadata.version!r} is not semantic versioning (for example 1.2.3)."),
+                relative,
+                _line_for_json_key(text, "version"),
+            )
+        )
+
+    metadata.valid = not any(finding.rule_id == "HPG002" for finding in findings)
+    return metadata, findings
+
+
+def _construct_unique_json_mapping(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    mapping: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in mapping:
+            raise ValueError(f"found duplicate key {key!r}")
+        mapping[key] = value
+    return mapping
+
+
+def _line_for_json_key(text: str, key: str) -> int:
+    match = re.search(rf'^\s*"{re.escape(key)}"\s*:', text, re.MULTILINE)
+    return text.count("\n", 0, match.start()) + 1 if match else 1
 
 
 def _relative(path: Path, root: Path) -> str:
