@@ -18,7 +18,7 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Remote-dependency pinning and version-bound checks.
 - Human-readable, JSON, SARIF, and GitHub annotation output.
 - Configurable failure thresholds and per-rule command-line exclusions.
-- Composite GitHub Action and pinned continuous-integration workflow template.
+- Composite GitHub Action and pinned continuous-integration workflow.
 
 [Unreleased]: https://github.com/mauricemohr88-debug/hermes-plugin-guard/compare/v0.1.0...HEAD
 [0.1.0]: https://github.com/mauricemohr88-debug/hermes-plugin-guard/releases/tag/v0.1.0

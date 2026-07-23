@@ -3,6 +3,5 @@ include CODE_OF_CONDUCT.md
 include CONTRIBUTING.md
 include SECURITY.md
 recursive-include docs *.svg
-recursive-include examples *.yml
 recursive-include tests *.json *.py *.txt *.yaml
 recursive-include tests LICENSE SECURITY.md

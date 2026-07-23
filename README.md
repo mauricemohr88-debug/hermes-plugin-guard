@@ -1,5 +1,6 @@
 # Hermes Plugin Guard
 
+[![CI](https://github.com/mauricemohr88-debug/hermes-plugin-guard/actions/workflows/ci.yml/badge.svg)](https://github.com/mauricemohr88-debug/hermes-plugin-guard/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-3776ab.svg)](pyproject.toml)
 
@@ -139,10 +140,6 @@ jobs:
 
 For stronger supply-chain controls, pin `hermes-plugin-guard` to a reviewed full commit SHA
 instead of a moving tag.
-
-Maintainers of this repository can copy the pinned
-[`examples/ci.yml`](examples/ci.yml) template to `.github/workflows/ci.yml` to run the project's
-lint, test, coverage, and packaging matrix on Python 3.11–3.13.
 
 ## Rules at a glance
 
