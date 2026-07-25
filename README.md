@@ -16,18 +16,18 @@ basic repository hygiene. Target plugin code is read as data: it is never import
 This is an unofficial community project. It is not affiliated with, endorsed by, or maintained
 by Nous Research.
 
-![20-second terminal demo of installing and running Hermes Plugin Guard](https://raw.githubusercontent.com/mauricemohr88-debug/hermes-plugin-guard/v0.1.1/docs/demo.gif)
+![20-second terminal demo of installing and running Hermes Plugin Guard](https://raw.githubusercontent.com/mauricemohr88-debug/hermes-plugin-guard/v0.1.2/docs/demo.gif)
 
 ## Five-minute beta test
 
 If you maintain or use a Hermes plugin, one local scan is enough to help improve the rules.
 Python 3.11 or newer and [pipx](https://pipx.pypa.io/stable/) are required.
 
-1. Install the v0.1.1 release directly from GitHub:
+1. Install the v0.1.2 release directly from GitHub:
 
    ```bash
    pipx install \
-     "git+https://github.com/mauricemohr88-debug/hermes-plugin-guard.git@v0.1.1"
+     "git+https://github.com/mauricemohr88-debug/hermes-plugin-guard.git@v0.1.2"
    ```
 
 2. Scan your plugin without failing the command on findings:
@@ -45,7 +45,7 @@ The scan stays on your computer. `hpg` reads target files as data, does not impo
 target plugin code, makes no network requests, includes no telemetry, and uploads neither source
 code nor results. Do not paste private code, credentials, or unsanitized paths into a public issue.
 
-Once v0.1.1 is visible on
+Once v0.1.2 is visible on
 [PyPI](https://pypi.org/project/hermes-plugin-guard/), the shorter installation command is:
 
 ```bash
@@ -66,7 +66,8 @@ The scanner is designed to make high-risk patterns visible, including:
 - direct subprocess calls that bypass Hermes' terminal-tool approval path;
 - dynamic execution and unsafe deserialization;
 - sensitive-path access, destructive filesystem operations, and disabled TLS verification;
-- all-interface listeners, networking capability, and undeclared secret environment variables;
+- all-interface listeners, networking capability, concrete outbound calls with redacted
+  destinations, and undeclared secret environment variables;
 - privileged registration surfaces and work performed during import or registration;
 - likely committed credentials and mutable remote dependencies;
 - manifest drift, missing tests, and missing project policies.
@@ -80,7 +81,7 @@ Install the current release directly from GitHub with
 
 ```bash
 pipx install \
-  "git+https://github.com/mauricemohr88-debug/hermes-plugin-guard.git@v0.1.1"
+  "git+https://github.com/mauricemohr88-debug/hermes-plugin-guard.git@v0.1.2"
 ```
 
 After the release is published to
@@ -179,7 +180,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: mauricemohr88-debug/hermes-plugin-guard@v0.1.1
+      - uses: mauricemohr88-debug/hermes-plugin-guard@v0.1.2
         with:
           path: path/to/plugin
           fail-on: high
@@ -194,11 +195,24 @@ instead of a moving tag.
 | IDs | Area | Examples |
 | --- | --- | --- |
 | `HPG001`–`HPG006` | Manifest | Missing or invalid manifest, unknown kind, entry point and hook drift |
-| `HPG101`–`HPG111` | Python | Execution, deserialization, processes, sensitive paths, network and privileged behavior |
+| `HPG101`–`HPG112` | Python | Execution, deserialization, processes, sensitive paths, network and privileged behavior |
 | `HPG201`–`HPG203` | Supply chain | Likely secrets, mutable remote dependencies, unbounded versions |
 | `HPG301`–`HPG303` | Project | License, security policy, and automated tests |
 
 Run `hpg rules` for the current severity, explanation, and suggested remediation for every rule.
+
+### Network-egress inventory
+
+`HPG106` reports that a plugin imports a network-capable module. `HPG112` is more specific: it
+reports a concrete outbound request or connection and records the statically visible destination.
+The scanner never resolves DNS or makes a request while doing this.
+
+Destination evidence is deliberately limited to the scheme, hostname, and port. User information,
+paths, query strings, fragments, headers, and payloads are never copied into a finding. Dynamic or
+relative destinations are reported as `<dynamic destination>`. Loopback calls default to low,
+encrypted external calls to medium, and explicitly cleartext HTTP, FTP, WebSocket, or gRPC and
+link-local/cloud-metadata targets to high. Raw TCP and SMTP stay medium because the protocol may
+upgrade to TLS after connecting.
 
 ## Threat model
 
@@ -215,6 +229,9 @@ maintainer history before installation.
 
 - Static analysis cannot reliably resolve dynamically constructed names, paths, commands, or
   network destinations.
+- Egress checks cover common Python HTTP, WebSocket, socket, FTP, SMTP, and gRPC APIs. Calls hidden
+  behind dependencies, arbitrary SDK wrappers, native extensions, or dashboard JavaScript can
+  require manual review.
 - A finding describes a risky capability or pattern, not necessarily a vulnerability.
 - The absence of findings does not establish safety.
 - Secret matching is heuristic and may produce false positives or miss encoded or split secrets.
