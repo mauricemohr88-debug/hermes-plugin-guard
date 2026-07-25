@@ -22,6 +22,7 @@ VALID_HOOKS = {
     "transform_llm_output",
     "pre_llm_call",
     "post_llm_call",
+    "pre_verify",
     "pre_api_request",
     "post_api_request",
     "api_request_error",
@@ -34,6 +35,9 @@ VALID_HOOKS = {
     "pre_gateway_dispatch",
     "pre_approval_request",
     "post_approval_response",
+    "kanban_task_claimed",
+    "kanban_task_completed",
+    "kanban_task_blocked",
 }
 SEMVER_RE = re.compile(
     r"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)"

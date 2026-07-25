@@ -17,7 +17,7 @@ body:
     attributes:
       label: Hermes Plugin Guard version
       description: Run `hpg --version` and paste the result.
-      placeholder: hermes-plugin-guard 0.1.1
+      placeholder: hermes-plugin-guard 0.1.2
     validations:
       required: true
 

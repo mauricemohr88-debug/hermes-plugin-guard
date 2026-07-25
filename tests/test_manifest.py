@@ -38,6 +38,35 @@ def test_all_documented_plugin_kinds_are_accepted(tmp_path: Path, kind: str) -> 
     assert "HPG004" not in {finding.rule_id for finding in findings}
 
 
+@pytest.mark.parametrize(
+    "hook",
+    [
+        "pre_verify",
+        "kanban_task_claimed",
+        "kanban_task_completed",
+        "kanban_task_blocked",
+    ],
+)
+def test_current_hermes_hooks_are_accepted(tmp_path: Path, hook: str) -> None:
+    root = _write_manifest(
+        tmp_path / hook,
+        "\n".join(
+            [
+                "name: example",
+                "version: 1.0.0",
+                "description: Example",
+                "hooks:",
+                f"  - {hook}",
+                "",
+            ]
+        ),
+    )
+
+    _, findings = inspect_manifest(root, root)
+
+    assert "HPG006" not in {finding.rule_id for finding in findings}
+
+
 def test_manifest_reports_invalid_yaml_with_source_location(tmp_path: Path) -> None:
     root = _write_manifest(
         tmp_path / "bad-yaml",

@@ -7,12 +7,19 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-07-25
+
 ### Added
 
 - `HPG112` inventories concrete outbound Python network calls without executing code, resolving
   DNS, or making requests.
 - Destination-aware findings redact credentials, paths, queries, fragments, headers, and payloads,
   and distinguish loopback, encrypted, cleartext, and link-local/cloud-metadata targets.
+
+### Changed
+
+- Recognize the current Hermes `pre_verify` and Kanban task hooks so valid plugin manifests do not
+  receive `HPG006` compatibility findings.
 
 ## [0.1.1] - 2026-07-23
 
@@ -49,6 +56,7 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Configurable failure thresholds and per-rule command-line exclusions.
 - Composite GitHub Action and pinned continuous-integration workflow.
 
-[Unreleased]: https://github.com/mauricemohr88-debug/hermes-plugin-guard/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/mauricemohr88-debug/hermes-plugin-guard/compare/v0.1.2...HEAD
+[0.1.2]: https://github.com/mauricemohr88-debug/hermes-plugin-guard/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/mauricemohr88-debug/hermes-plugin-guard/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/mauricemohr88-debug/hermes-plugin-guard/releases/tag/v0.1.0
