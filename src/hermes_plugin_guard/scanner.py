@@ -7,7 +7,15 @@ from typing import Iterable
 
 from .catalog import get_rule
 from .dependency_scan import inspect_dependencies
-from .manifest import VALID_HOOKS, PluginMetadata, inspect_manifest
+from .manifest import (
+    DASHBOARD_MANIFEST,
+    VALID_HOOKS,
+    PluginMetadata,
+    has_hermes_entry_points,
+    inspect_dashboard_manifest,
+    inspect_entry_point_manifest,
+    inspect_manifest,
+)
 from .models import Finding, ScanResult, Severity
 from .python_scan import inspect_python
 from .secret_scan import MAX_TEXT_BYTES, inspect_file
@@ -61,12 +69,25 @@ def scan(
     result.plugin_count = len(plugin_roots)
     scan_roots = plugin_roots or [root]
     scanned_paths: set[Path] = set()
-    all_metadata: list[PluginMetadata] = []
 
     for plugin_root in scan_roots:
         metadata, manifest_findings = inspect_manifest(plugin_root, root)
-        all_metadata.append(metadata)
         result.findings.extend(manifest_findings)
+        entry_point_count = metadata.entry_point_count
+        if metadata.declaration_source != "pyproject.toml":
+            entry_point_result = inspect_entry_point_manifest(plugin_root, root)
+            if entry_point_result is not None:
+                entry_point_metadata, entry_point_findings = entry_point_result
+                entry_point_count = entry_point_metadata.entry_point_count
+                result.findings.extend(entry_point_findings)
+        if entry_point_count > 1:
+            result.plugin_count += entry_point_count - 1
+        if (
+            metadata.declaration_source != "dashboard/manifest.json"
+            and (plugin_root / DASHBOARD_MANIFEST).is_file()
+        ):
+            _, dashboard_findings = inspect_dashboard_manifest(plugin_root, root)
+            result.findings.extend(dashboard_findings)
         result.findings.extend(_symlink_findings(plugin_root, root))
 
         literal_hooks: dict[str, tuple[str, int]] = {}
@@ -144,6 +165,7 @@ def _has_plugin_marker(root: Path) -> bool:
         (root / "plugin.yaml").is_file()
         or (root / "plugin.yml").is_file()
         or (root / "dashboard" / "manifest.json").is_file()
+        or has_hermes_entry_points(root)
     )
 
 
@@ -230,30 +252,31 @@ def _hook_drift(
                 evidence=hook,
             )
         )
-    for hook in sorted(actual - metadata.declared_hooks):
-        path, line = literal_hooks[hook]
-        rule = get_rule("HPG006")
-        findings.append(
-            Finding(
-                rule_id="HPG006",
-                severity=rule.default_severity,
-                message=f"Hook {hook!r} is registered in code but absent from plugin.yaml.",
-                path=path,
-                line=line,
-                evidence=hook,
+    if metadata.has_hook_declarations:
+        for hook in sorted(actual - metadata.declared_hooks):
+            path, line = literal_hooks[hook]
+            rule = get_rule("HPG006")
+            findings.append(
+                Finding(
+                    rule_id="HPG006",
+                    severity=rule.default_severity,
+                    message=f"Hook {hook!r} is registered in code but absent from plugin.yaml.",
+                    path=path,
+                    line=line,
+                    evidence=hook,
+                )
             )
-        )
-    for hook in sorted(metadata.declared_hooks - actual):
-        rule = get_rule("HPG006")
-        findings.append(
-            Finding(
-                rule_id="HPG006",
-                severity=Severity.LOW,
-                message=f"Hook {hook!r} is declared but no literal ctx.register_hook call was found.",
-                path=_relative(metadata.root / "plugin.yaml", root),
-                evidence=hook,
+        for hook in sorted(metadata.declared_hooks - actual):
+            rule = get_rule("HPG006")
+            findings.append(
+                Finding(
+                    rule_id="HPG006",
+                    severity=Severity.LOW,
+                    message=f"Hook {hook!r} is declared but no literal ctx.register_hook call was found.",
+                    path=_relative(metadata.root / "plugin.yaml", root),
+                    evidence=hook,
+                )
             )
-        )
     if "pre_gateway_dispatch" in actual:
         path, line = literal_hooks["pre_gateway_dispatch"]
         findings.append(

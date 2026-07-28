@@ -26,9 +26,15 @@ def _rule(
 RULES: dict[str, Rule] = {
     "HPG001": _rule(
         "HPG001",
-        "Plugin manifest missing",
-        "Hermes uses plugin.yaml for plugin identity, routing, and introspection.",
-        "Add a plugin.yaml file to every plugin directory.",
+        "Plugin declaration missing",
+        (
+            "Hermes directory plugins use plugin.yaml; pip-distributed plugins use the "
+            "hermes_agent.plugins entry-point group."
+        ),
+        (
+            "Add plugin.yaml to a directory plugin or declare "
+            '[project.entry-points."hermes_agent.plugins"] in pyproject.toml.'
+        ),
         Severity.HIGH,
         "manifest",
     ),
@@ -42,9 +48,9 @@ RULES: dict[str, Rule] = {
     ),
     "HPG003": _rule(
         "HPG003",
-        "Required manifest metadata missing",
+        "Required plugin metadata missing",
         "Name, version, and description make plugins identifiable and reviewable.",
-        "Add the missing metadata field to plugin.yaml.",
+        "Add the missing metadata to plugin.yaml or the pyproject.toml project table.",
         Severity.MEDIUM,
         "manifest",
     ),
@@ -59,8 +65,8 @@ RULES: dict[str, Rule] = {
     "HPG005": _rule(
         "HPG005",
         "Plugin entry point missing",
-        "Directory plugins need an __init__.py entry point for discovery.",
-        "Add __init__.py and expose the loader expected by the plugin kind.",
+        "Directory plugins need __init__.py; dashboard plugins need their declared bundle.",
+        "Add the missing entry file and expose the loader expected by the plugin kind.",
         Severity.HIGH,
         "manifest",
     ),
@@ -75,8 +81,11 @@ RULES: dict[str, Rule] = {
     "HPG101": _rule(
         "HPG101",
         "Dynamic code execution",
-        "eval, exec, and compile can execute content that static review cannot bound.",
-        "Replace dynamic execution with a parser or a narrow allow-listed dispatcher.",
+        (
+            "eval, exec, compile, and direct __import__ calls can execute or obscure "
+            "content that static review cannot fully bound."
+        ),
+        "Use normal imports, a parser, or a narrow allow-listed dispatcher.",
         Severity.HIGH,
         "python",
     ),
@@ -123,8 +132,11 @@ RULES: dict[str, Rule] = {
     "HPG107": _rule(
         "HPG107",
         "Undeclared secret environment access",
-        "A secret-like environment variable is read but not declared in requires_env.",
-        "Declare it in plugin.yaml so users see the credential requirement before enablement.",
+        (
+            "A secret-like environment variable is read but not declared in requires_env "
+            "or optional_env."
+        ),
+        ("Declare it in plugin.yaml so users see the credential requirement before enablement."),
         Severity.MEDIUM,
         "python",
     ),
@@ -193,6 +205,20 @@ RULES: dict[str, Rule] = {
         "An open-ended dependency range increases supply-chain and compatibility risk.",
         "Add a compatible upper bound, for example >=1.2,<2.",
         Severity.LOW,
+        "dependencies",
+    ),
+    "HPG204": _rule(
+        "HPG204",
+        "Remote installer executes without verification",
+        (
+            "Downloading a mutable script and piping it directly to a shell executes code "
+            "that was not part of the reviewed plugin."
+        ),
+        (
+            "Pin a versioned artifact, verify its checksum or signature, and execute it only "
+            "after verification."
+        ),
+        Severity.HIGH,
         "dependencies",
     ),
     "HPG301": _rule(

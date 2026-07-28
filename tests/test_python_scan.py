@@ -61,6 +61,119 @@ def test_dynamic_execution_shell_true_and_sensitive_path_are_high_risk(
     assert by_rule["HPG111"].severity.label == "high"
 
 
+def test_import_calls_remain_visible_while_docstrings_do_not_report_paths(
+    tmp_path: Path,
+) -> None:
+    inspection = _inspect(
+        tmp_path,
+        "\n".join(
+            [
+                '"""Documentation mentioning ~/.ssh/id_ed25519 is not a file access."""',
+                "def load(module_name):",
+                '    __import__("datetime")',
+                "    __import__(module_name)",
+                "    path = '~/.ssh/id_ed25519'",
+                "    return path",
+                "",
+            ]
+        ),
+    )
+
+    dynamic = [finding for finding in inspection.findings if finding.rule_id == "HPG101"]
+    sensitive_paths = [finding for finding in inspection.findings if finding.rule_id == "HPG104"]
+
+    assert [finding.line for finding in dynamic] == [3, 4]
+    assert len(sensitive_paths) == 1
+    assert sensitive_paths[0].line == 5
+
+
+def test_literal_import_chains_still_detect_process_and_network_calls(
+    tmp_path: Path,
+) -> None:
+    inspection = _inspect(
+        tmp_path,
+        "\n".join(
+            [
+                "def run():",
+                '    __import__("subprocess").run(["true"])',
+                '    __import__("requests").post("https://example.invalid/upload")',
+                "",
+            ]
+        ),
+    )
+    ids = [finding.rule_id for finding in inspection.findings]
+
+    assert ids.count("HPG101") == 2
+    assert ids.count("HPG103") == 1
+    assert ids.count("HPG106") == 1
+    assert ids.count("HPG112") == 1
+
+
+def test_literal_import_assignments_and_dotted_names_preserve_provenance(
+    tmp_path: Path,
+) -> None:
+    inspection = _inspect(
+        tmp_path,
+        "\n".join(
+            [
+                "def run():",
+                '    process = __import__("subprocess")',
+                '    client = __import__("requests")',
+                '    process.run(["true"])',
+                '    client.post("https://example.invalid/upload")',
+                '    __import__("os.path").system("true")',
+                "",
+            ]
+        ),
+    )
+    ids = [finding.rule_id for finding in inspection.findings]
+
+    assert ids.count("HPG101") == 3
+    assert ids.count("HPG103") == 2
+    assert ids.count("HPG106") == 1
+    assert ids.count("HPG112") == 1
+
+
+def test_literal_import_with_dynamic_fromlist_remains_dynamic_execution(
+    tmp_path: Path,
+) -> None:
+    inspection = _inspect(
+        tmp_path,
+        "\n".join(
+            [
+                "def load(parts):",
+                '    return __import__("os.path", fromlist=parts)',
+                "",
+            ]
+        ),
+    )
+
+    assert [finding.rule_id for finding in inspection.findings] == ["HPG101"]
+
+
+def test_obscured_literal_import_uses_never_become_zero_finding_bypasses(
+    tmp_path: Path,
+) -> None:
+    inspection = _inspect(
+        tmp_path,
+        "\n".join(
+            [
+                "class Plugin:",
+                "    def run(self):",
+                '        getattr(__import__("subprocess"), "run")(["id"])',
+                '        (module,) = (__import__("subprocess"),)',
+                '        module.run(["id"])',
+                '        self.module = __import__("subprocess")',
+                '        self.module.run(["id"])',
+                "",
+            ]
+        ),
+    )
+    dynamic = [finding for finding in inspection.findings if finding.rule_id == "HPG101"]
+
+    assert [finding.line for finding in dynamic] == [3, 4, 6]
+
+
 def test_network_alias_tls_listener_and_declared_environment_handling(
     tmp_path: Path,
 ) -> None:
@@ -119,6 +232,7 @@ def test_privileged_surfaces_and_literal_hooks_are_recorded(tmp_path: Path) -> N
                 "def register(ctx):",
                 "    ctx.register_tool(name='terminal', fn=lambda: None, override=True)",
                 "    ctx.register_hook('pre_gateway_dispatch', lambda event: event)",
+                "    ctx.register_middleware('tool_execution', lambda call_next: call_next)",
                 "    ctx.inject_message('hello')",
                 "",
             ]
@@ -126,11 +240,34 @@ def test_privileged_surfaces_and_literal_hooks_are_recorded(tmp_path: Path) -> N
     )
 
     privileged = [finding for finding in inspection.findings if finding.rule_id == "HPG110"]
-    assert len(privileged) == 2
+    assert len(privileged) == 3
     assert any(finding.severity.label == "critical" for finding in privileged)
     assert inspection.literal_hooks == {
         "pre_gateway_dispatch": ("plugin.py", 3),
     }
+
+
+def test_non_secret_environment_metadata_names_are_not_reported(tmp_path: Path) -> None:
+    inspection = _inspect(
+        tmp_path,
+        "\n".join(
+            [
+                "import os",
+                "def configure():",
+                "    return (",
+                "        os.getenv('HONCHO_OAUTH_TOKEN_URL'),",
+                "        os.getenv('OAUTHLIB_RELAX_TOKEN_SCOPE'),",
+                "        os.getenv('CIRCLE_TOKEN_ID'),",
+                "        os.getenv('ACTUAL_API_TOKEN'),",
+                "    )",
+                "",
+            ]
+        ),
+    )
+
+    undeclared = [finding for finding in inspection.findings if finding.rule_id == "HPG107"]
+
+    assert [finding.evidence for finding in undeclared] == ["ACTUAL_API_TOKEN"]
 
 
 def test_positional_override_and_keyword_hook_name_are_detected(tmp_path: Path) -> None:
