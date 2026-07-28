@@ -7,11 +7,19 @@ import tomllib
 from pathlib import Path
 from typing import Iterable
 
+import yaml
+
 from .catalog import get_rule
+from .manifest import MAX_MANIFEST_BYTES
 from .models import Finding
 
 FULL_SHA_RE = re.compile(r"(?i)(?:@|/)[0-9a-f]{40}(?:[#?]|$)")
 NAME_RE = re.compile(r"^[A-Za-z0-9_.-]+")
+REMOTE_FETCH_RE = re.compile(r"(?i)\b(?:curl|wget)\b[^\n]*(?:https?://)")
+PIPE_TO_SHELL_RE = re.compile(
+    r"(?i)\|\s*(?:(?:/usr/bin/env|env)\s+)?(?:ba|da|fi|z)?sh\b"
+    r"|\|\s*(?:iex|invoke-expression)\b"
+)
 
 
 def inspect_dependencies(root: Path, repository_root: Path) -> list[Finding]:
@@ -21,6 +29,9 @@ def inspect_dependencies(root: Path, repository_root: Path) -> list[Finding]:
     pyproject = root / "pyproject.toml"
     if pyproject.is_file():
         candidates.append(pyproject)
+    manifest = root / "plugin.yaml"
+    if manifest.is_file():
+        candidates.append(manifest)
 
     for path in candidates:
         resolved = path.resolve()
@@ -29,6 +40,8 @@ def inspect_dependencies(root: Path, repository_root: Path) -> list[Finding]:
         seen.add(resolved)
         if path.name == "pyproject.toml":
             findings.extend(_inspect_pyproject(path, repository_root))
+        elif path.name == "plugin.yaml":
+            findings.extend(_inspect_plugin_manifest(path, repository_root))
         else:
             findings.extend(_inspect_requirements(path, repository_root))
     return findings
@@ -55,7 +68,11 @@ def _inspect_pyproject(path: Path, root: Path) -> list[Finding]:
 
     dependencies: list[str] = []
     project = data.get("project")
+    project_name = ""
     if isinstance(project, dict):
+        raw_name = project.get("name")
+        if isinstance(raw_name, str):
+            project_name = raw_name
         raw = project.get("dependencies")
         if isinstance(raw, list):
             dependencies.extend(item for item in raw if isinstance(item, str))
@@ -82,11 +99,108 @@ def _inspect_pyproject(path: Path, root: Path) -> list[Finding]:
                 search_from = index + 1
                 break
         entries.append((line_number, dependency))
-    return _inspect_entries(entries, _relative(path, root))
+    ignored_names = {project_name} if project_name else set()
+    return _inspect_entries(entries, _relative(path, root), ignored_names=ignored_names)
 
 
-def _inspect_entries(entries: Iterable[tuple[int, str]], relative_path: str) -> list[Finding]:
+def _inspect_plugin_manifest(path: Path, root: Path) -> list[Finding]:
+    try:
+        if path.stat().st_size > MAX_MANIFEST_BYTES:
+            # The structural manifest pass reports HPG002. Do not parse the
+            # same oversized untrusted YAML again during dependency analysis.
+            return []
+        with path.open(encoding="utf-8") as stream:
+            text = stream.read(MAX_MANIFEST_BYTES + 1)
+        if len(text) > MAX_MANIFEST_BYTES:
+            return []
+        data = yaml.safe_load(text) or {}
+    except (OSError, UnicodeError, yaml.YAMLError, RecursionError):
+        return []
+    if not isinstance(data, dict):
+        return []
+
+    lines = text.splitlines()
+    pip_dependencies = data.get("pip_dependencies")
+    entries: list[tuple[int, str]] = []
+    if isinstance(pip_dependencies, list):
+        search_from = 0
+        for dependency in pip_dependencies:
+            if not isinstance(dependency, str):
+                continue
+            line_number, search_from = _line_for_yaml_value(
+                lines,
+                dependency,
+                search_from,
+                key=None,
+            )
+            entries.append((line_number, dependency))
+
+    relative = _relative(path, root)
+    findings = _inspect_entries(entries, relative)
+    external_dependencies = data.get("external_dependencies")
+    if not isinstance(external_dependencies, list):
+        return findings
+
+    search_from = 0
+    for dependency in external_dependencies:
+        if not isinstance(dependency, dict):
+            continue
+        install = dependency.get("install")
+        if not isinstance(install, str) or not _pipes_remote_script_to_shell(install):
+            continue
+        line_number, search_from = _line_for_yaml_value(
+            lines,
+            install,
+            search_from,
+            key="install",
+        )
+        rule = get_rule("HPG204")
+        findings.append(
+            Finding(
+                rule_id="HPG204",
+                severity=rule.default_severity,
+                message="External dependency downloads a remote script and pipes it to a shell.",
+                path=relative,
+                line=line_number,
+                evidence="remote download | shell",
+            )
+        )
+    return findings
+
+
+def _line_for_yaml_value(
+    lines: list[str],
+    value: str,
+    search_from: int,
+    *,
+    key: str | None,
+) -> tuple[int, int]:
+    def is_candidate(line: str) -> bool:
+        stripped = line.lstrip()
+        marker = f"{key}:" if key else "-"
+        return stripped.startswith(marker) and value in line
+
+    for index in range(search_from, len(lines)):
+        if is_candidate(lines[index]):
+            return index + 1, index + 1
+    for index, line in enumerate(lines):
+        if is_candidate(line):
+            return index + 1, index + 1
+    return 1, search_from
+
+
+def _pipes_remote_script_to_shell(command: str) -> bool:
+    return bool(REMOTE_FETCH_RE.search(command) and PIPE_TO_SHELL_RE.search(command))
+
+
+def _inspect_entries(
+    entries: Iterable[tuple[int, str]],
+    relative_path: str,
+    *,
+    ignored_names: set[str] | None = None,
+) -> list[Finding]:
     findings: list[Finding] = []
+    normalized_ignored = {_normalize_name(name) for name in ignored_names or set()}
     for line, raw_entry in entries:
         entry = raw_entry.split(";", 1)[0].strip()
         if not entry or entry.startswith(("-e ", "--editable ")):
@@ -117,7 +231,12 @@ def _inspect_entries(entries: Iterable[tuple[int, str]], relative_path: str) -> 
         if not NAME_RE.match(entry):
             continue
 
-        spec = entry[NAME_RE.match(entry).end() :]  # type: ignore[union-attr]
+        match = NAME_RE.match(entry)
+        if match is None:
+            continue
+        if _normalize_name(match.group(0)) in normalized_ignored:
+            continue
+        spec = entry[match.end() :]
         bounded = "==" in spec or "~=" in spec or "<" in spec
         if not bounded:
             rule = get_rule("HPG203")
@@ -132,6 +251,10 @@ def _inspect_entries(entries: Iterable[tuple[int, str]], relative_path: str) -> 
                 )
             )
     return findings
+
+
+def _normalize_name(name: str) -> str:
+    return re.sub(r"[-_.]+", "-", name).casefold()
 
 
 def _relative(path: Path, root: Path) -> str:

@@ -186,6 +186,101 @@ def test_nested_src_layout_is_discovered_without_root_manifest(tmp_path: Path) -
     assert result.findings == []
 
 
+def test_pip_entry_point_plugin_is_discovered_without_plugin_yaml(tmp_path: Path) -> None:
+    repository = tmp_path / "entrypoint-plugin"
+    package = repository / "src" / "example_plugin"
+    package.mkdir(parents=True)
+    (repository / "pyproject.toml").write_text(
+        "\n".join(
+            [
+                "[build-system]",
+                'requires = ["setuptools>=77,<81"]',
+                'build-backend = "setuptools.build_meta"',
+                "",
+                "[project]",
+                'name = "example-hermes-plugin"',
+                'version = "1.2.3"',
+                'description = "Example pip-distributed Hermes plugin"',
+                "dependencies = []",
+                "",
+                '[project.entry-points."hermes_agent.plugins"]',
+                'example = "example_plugin"',
+                'second-example = "example_plugin"',
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    (package / "__init__.py").write_text(
+        "\n".join(
+            [
+                "def register(ctx):",
+                '    ctx.register_hook("pre_tool_call", lambda **kwargs: None)',
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    (repository / "LICENSE").write_text("Example license\n", encoding="utf-8")
+    (repository / "SECURITY.md").write_text("Example policy\n", encoding="utf-8")
+    (repository / "tests").mkdir()
+
+    result = scan(repository)
+    ids = {finding.rule_id for finding in result.findings}
+
+    assert result.plugin_count == 2
+    assert result.scanned_files >= 2
+    assert {"HPG001", "HPG005", "HPG006"}.isdisjoint(ids)
+    assert result.findings == []
+
+    (package / "__init__.py").write_text(
+        "\n".join(
+            [
+                "def register(ctx):",
+                '    ctx.register_hook("invented_hook", lambda **kwargs: None)',
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    unknown_hook_result = scan(repository)
+
+    assert "HPG006" in {finding.rule_id for finding in unknown_hook_result.findings}
+
+
+def test_invalid_pip_entry_point_candidate_is_discovered_in_monorepo(
+    tmp_path: Path,
+) -> None:
+    repository = tmp_path / "repository"
+    plugin = repository / "packages" / "broken-plugin"
+    plugin.mkdir(parents=True)
+    (plugin / "pyproject.toml").write_text(
+        "\n".join(
+            [
+                "[project]",
+                'name = "broken-hermes-plugin"',
+                "",
+                '[project.entry-points."hermes_agent.plugins"]',
+                'valid = "example_plugin"',
+                'broken = ""',
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    (repository / "LICENSE").write_text("Example license\n", encoding="utf-8")
+    (repository / "SECURITY.md").write_text("Example policy\n", encoding="utf-8")
+    (repository / "tests").mkdir()
+
+    result = scan(repository)
+    structural_findings = [finding for finding in result.findings if finding.rule_id == "HPG002"]
+
+    assert result.plugin_count == 2
+    assert [(finding.path, finding.line) for finding in structural_findings] == [
+        ("packages/broken-plugin/pyproject.toml", 4)
+    ]
+
+
 def test_known_category_layouts_and_fixture_manifests_are_bounded(
     tmp_path: Path,
 ) -> None:
@@ -214,8 +309,10 @@ def test_dashboard_only_plugin_uses_its_official_manifest(tmp_path: Path) -> Non
             [
                 "{",
                 '  "name": "example",',
+                '  "label": "Example",',
                 '  "version": "1.0.0",',
                 '  "description": "Example dashboard plugin",',
+                '  "tab": {"path": "/example"},',
                 '  "entry": "dist/index.js",',
                 '  "api": "plugin_api.py"',
                 "}",
@@ -228,6 +325,9 @@ def test_dashboard_only_plugin_uses_its_official_manifest(tmp_path: Path) -> Non
         "def build_router():\n    return None\n",
         encoding="utf-8",
     )
+    bundle = dashboard / "dist" / "index.js"
+    bundle.parent.mkdir()
+    bundle.write_text("export default {};\n", encoding="utf-8")
     (plugin / "LICENSE").write_text("Example license\n", encoding="utf-8")
     (plugin / "SECURITY.md").write_text("Example policy\n", encoding="utf-8")
     (plugin / "tests").mkdir()
@@ -241,3 +341,84 @@ def test_dashboard_only_plugin_uses_its_official_manifest(tmp_path: Path) -> Non
     assert result.plugin_count == 1
     assert {"HPG001", "HPG005"}.isdisjoint(finding.rule_id for finding in result.findings)
     assert result.findings == []
+
+
+def test_directory_plugin_also_validates_its_dashboard_manifest(tmp_path: Path) -> None:
+    plugin = make_clean_plugin(tmp_path / "combined-plugin")
+    dashboard = plugin / "dashboard"
+    dashboard.mkdir()
+    (dashboard / "manifest.json").write_text(
+        '{"name":"combined","tab":{"path":"/combined"},"entry":"dist/index.js"}\n',
+        encoding="utf-8",
+    )
+    bundle = dashboard / "dist" / "index.js"
+    bundle.parent.mkdir()
+    bundle.write_text("export default {};\n", encoding="utf-8")
+
+    result = scan(plugin)
+
+    dashboard_findings = [
+        finding for finding in result.findings if finding.path == "dashboard/manifest.json"
+    ]
+    assert [(finding.rule_id, finding.message) for finding in dashboard_findings] == [
+        ("HPG003", "Required dashboard manifest field 'label' is missing or empty.")
+    ]
+
+
+def test_unrecognized_dashboard_kind_cannot_skip_dashboard_validation(
+    tmp_path: Path,
+) -> None:
+    plugin = make_clean_plugin(tmp_path / "combined-plugin")
+    manifest = plugin / "plugin.yaml"
+    manifest.write_text(
+        manifest.read_text(encoding="utf-8").replace(
+            "kind: standalone",
+            "kind: dashboard",
+        ),
+        encoding="utf-8",
+    )
+    dashboard = plugin / "dashboard"
+    dashboard.mkdir()
+    (dashboard / "manifest.json").write_text(
+        (
+            '{"name":"combined","label":"Combined","tab":{"path":"/combined"},'
+            '"entry":"../../outside.js"}\n'
+        ),
+        encoding="utf-8",
+    )
+
+    result = scan(plugin)
+
+    assert {"HPG002", "HPG004"} <= {finding.rule_id for finding in result.findings}
+    assert any(
+        finding.rule_id == "HPG002" and finding.path == "dashboard/manifest.json"
+        for finding in result.findings
+    )
+
+
+def test_directory_plugin_also_validates_pip_entry_points(tmp_path: Path) -> None:
+    plugin = make_clean_plugin(tmp_path / "combined-plugin")
+    (plugin / "pyproject.toml").write_text(
+        "\n".join(
+            [
+                "[project]",
+                'name = "combined-plugin"',
+                'version = "1.0.0"',
+                'description = "Combined plugin"',
+                "",
+                '[project.entry-points."hermes_agent.plugins"]',
+                'valid = "combined_plugin"',
+                "broken = 42",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    result = scan(plugin)
+
+    assert result.plugin_count == 2
+    assert any(
+        finding.rule_id == "HPG002" and finding.path == "pyproject.toml"
+        for finding in result.findings
+    )

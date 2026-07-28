@@ -60,6 +60,14 @@ STANDARD_ENV = {
     "TMPDIR",
     "USER",
 }
+NON_SECRET_ENV_SUFFIXES = (
+    "_ID",
+    "_NAME",
+    "_PATH",
+    "_SCOPE",
+    "_URI",
+    "_URL",
+)
 HTTP_METHODS = {
     "delete",
     "get",
@@ -216,9 +224,15 @@ class _BindingState:
 
 
 class _Analyzer(ast.NodeVisitor):
-    def __init__(self, relative_path: str, declared_env: set[str]) -> None:
+    def __init__(
+        self,
+        relative_path: str,
+        declared_env: set[str],
+        docstring_nodes: set[int],
+    ) -> None:
         self.relative_path = relative_path
         self.declared_env = declared_env
+        self.docstring_nodes = docstring_nodes
         self.findings: list[Finding] = []
         self.literal_hooks: dict[str, tuple[str, int]] = {}
         self._alias_scopes: list[dict[str, str | None]] = [{}]
@@ -293,9 +307,21 @@ class _Analyzer(ast.NodeVisitor):
     def visit_Call(self, node: ast.Call) -> None:
         name = self._qualified_name(node.func)
 
-        if name in {
+        import_calls = {
             "__import__",
             "builtins.__import__",
+        }
+        if name in import_calls:
+            self.add(
+                "HPG101",
+                node,
+                f"Direct module loading via {name}() obscures static data flow.",
+                evidence=name,
+            )
+            module_name = self._literal_import_module(node)
+            if module_name is not None:
+                self._check_network_module(module_name, node)
+        elif name in {
             "builtins.compile",
             "builtins.eval",
             "builtins.exec",
@@ -412,17 +438,36 @@ class _Analyzer(ast.NodeVisitor):
                 evidence=name,
             )
 
+        if name.endswith(".register_middleware"):
+            middleware_kind = (
+                self._string_value(node.args[0])
+                if node.args
+                else self._keyword_string(node, "kind")
+            ) or "<dynamic>"
+            self.add(
+                "HPG110",
+                node,
+                (
+                    f"Plugin registers {middleware_kind!r} middleware that can wrap or "
+                    "rewrite core execution."
+                ),
+                evidence=middleware_kind,
+            )
+
         env_name = self._environment_read(name, node)
         if (
             env_name
             and env_name not in self.declared_env
             and env_name not in STANDARD_ENV
-            and SECRET_NAME_RE.search(env_name)
+            and self._looks_like_secret_environment(env_name)
         ):
             self.add(
                 "HPG107",
                 node,
-                f"Secret-like environment variable {env_name!r} is read but not declared in requires_env.",
+                (
+                    f"Secret-like environment variable {env_name!r} is read but not "
+                    "declared in requires_env or optional_env."
+                ),
                 evidence=env_name,
             )
 
@@ -440,12 +485,15 @@ class _Analyzer(ast.NodeVisitor):
                 env_name
                 and env_name not in self.declared_env
                 and env_name not in STANDARD_ENV
-                and SECRET_NAME_RE.search(env_name)
+                and self._looks_like_secret_environment(env_name)
             ):
                 self.add(
                     "HPG107",
                     node,
-                    f"Secret-like environment variable {env_name!r} is read but not declared in requires_env.",
+                    (
+                        f"Secret-like environment variable {env_name!r} is read but not "
+                        "declared in requires_env or optional_env."
+                    ),
                     evidence=env_name,
                 )
         self.generic_visit(node)
@@ -631,7 +679,7 @@ class _Analyzer(ast.NodeVisitor):
             self._function_stack.pop()
 
     def visit_Constant(self, node: ast.Constant) -> None:
-        if isinstance(node.value, str):
+        if isinstance(node.value, str) and id(node) not in self.docstring_nodes:
             normalized = "/" + node.value.replace("\\", "/").lower().lstrip("/")
             match = next(
                 (part for part in SENSITIVE_PATH_PARTS if part in normalized),
@@ -645,6 +693,13 @@ class _Analyzer(ast.NodeVisitor):
                     evidence=match,
                 )
         self.generic_visit(node)
+
+    @staticmethod
+    def _looks_like_secret_environment(name: str) -> bool:
+        normalized = name.upper()
+        if normalized.endswith(NON_SECRET_ENV_SUFFIXES):
+            return False
+        return SECRET_NAME_RE.search(normalized) is not None
 
     def _qualified_name(self, node: ast.AST) -> str:
         if isinstance(node, ast.Name):
@@ -660,6 +715,9 @@ class _Analyzer(ast.NodeVisitor):
             parent = self._qualified_name(node.value)
             return f"{parent}.{node.attr}".strip(".")
         if isinstance(node, ast.Call):
+            imported_module = self._literal_import_module(node)
+            if imported_module is not None:
+                return imported_module
             instance = self._network_instance(node)
             return instance.qualified_type if instance else ""
         if isinstance(node, ast.NamedExpr):
@@ -701,6 +759,9 @@ class _Analyzer(ast.NodeVisitor):
         return name
 
     def _copied_alias(self, node: ast.AST | None) -> str | None:
+        imported_module = self._literal_import_module(node)
+        if imported_module is not None:
+            return imported_module
         if not isinstance(node, (ast.Attribute, ast.Name)):
             return None
         reference = self._raw_reference(node)
@@ -723,12 +784,65 @@ class _Analyzer(ast.NodeVisitor):
     def _has_import_provenance(self, node: ast.AST) -> bool:
         if isinstance(node, ast.NamedExpr):
             return self._has_import_provenance(node.value)
+        if self._literal_import_module(node) is not None:
+            return True
+        if isinstance(node, ast.Attribute):
+            return self._has_import_provenance(node.value)
         reference = self._raw_reference(node)
         if not reference:
             return False
         root = reference.split(".", 1)[0]
         found, alias = self._alias_entry(root)
         return found and alias is not None
+
+    def _literal_import_module(self, node: ast.AST | None) -> str | None:
+        if not isinstance(node, ast.Call):
+            return None
+        name = self._qualified_name(node.func)
+        if name not in {"__import__", "builtins.__import__"}:
+            return None
+        if any(keyword.arg is None for keyword in node.keywords):
+            return None
+
+        name_node = node.args[0] if node.args else None
+        if name_node is None:
+            name_node = next(
+                (keyword.value for keyword in node.keywords if keyword.arg == "name"),
+                None,
+            )
+        module_name = self._string_value(name_node)
+        if not module_name:
+            return None
+
+        level_node = node.args[4] if len(node.args) > 4 else None
+        if level_node is None:
+            level_node = next(
+                (keyword.value for keyword in node.keywords if keyword.arg == "level"),
+                None,
+            )
+        if level_node is not None:
+            try:
+                level = ast.literal_eval(level_node)
+            except (ValueError, TypeError, RecursionError):
+                return None
+            if not isinstance(level, int) or level != 0:
+                return None
+
+        fromlist_node = node.args[3] if len(node.args) > 3 else None
+        if fromlist_node is None:
+            fromlist_node = next(
+                (keyword.value for keyword in node.keywords if keyword.arg == "fromlist"),
+                None,
+            )
+        if fromlist_node is None:
+            has_fromlist = False
+        else:
+            try:
+                has_fromlist = bool(ast.literal_eval(fromlist_node))
+            except (ValueError, TypeError, RecursionError):
+                return None
+
+        return module_name if has_fromlist else module_name.partition(".")[0]
 
     def _shadow_target(self, target: ast.AST) -> None:
         self._bind_network_instance(target, None)
@@ -1505,7 +1619,16 @@ def inspect_python(
             literal_hooks={},
         )
 
-    analyzer = _Analyzer(relative, declared_env)
+    docstring_nodes = {
+        id(statement.value)
+        for container in ast.walk(tree)
+        if isinstance(container, (ast.AsyncFunctionDef, ast.ClassDef, ast.FunctionDef, ast.Module))
+        and container.body
+        and isinstance((statement := container.body[0]), ast.Expr)
+        and isinstance(statement.value, ast.Constant)
+        and isinstance(statement.value.value, str)
+    }
+    analyzer = _Analyzer(relative, declared_env, docstring_nodes)
     analyzer.visit(tree)
     return PythonInspection(analyzer.findings, analyzer.literal_hooks)
 
