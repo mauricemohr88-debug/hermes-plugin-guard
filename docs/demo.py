@@ -135,25 +135,19 @@ def reveal(text: str, color: str = TEXT, *, duration: int = 520) -> None:
 
 
 def main() -> None:
-    # Intro and a real installation command for the v0.1.2 GitHub release.
+    # Intro and the current PyPI installation command.
     pause(900)
     pause(450, cursor=True)
-    type_line("$ pipx install \\", CYAN, step=1, delay=80)
-    type_line(
-        '> "git+https://github.com/mauricemohr88-debug/hermes-plugin-guard.git@v0.1.2"',
-        TEXT,
-        step=2,
-        delay=55,
-    )
+    type_line("$ pipx install hermes-plugin-guard", CYAN, step=1, delay=80)
     pause(850, cursor=True)
-    reveal("  installed package hermes-plugin-guard 0.1.2", MUTED, duration=650)
+    reveal("  installed package hermes-plugin-guard 0.1.3", MUTED, duration=650)
     reveal("  apps now available: hpg, hermes-plugin-guard", GREEN, duration=850)
     reveal("", duration=350)
 
     # The report below is the exact text format produced by the safe fixture.
     type_line("$ hpg scan ~/.hermes/plugins/my-plugin", CYAN, step=1, delay=70)
     pause(1_150, cursor=True)
-    reveal("hermes-plugin-guard 0.1.2", MUTED, duration=500)
+    reveal("hermes-plugin-guard 0.1.3", MUTED, duration=500)
     reveal("Scanned 1 plugin(s), 4 file(s) — 0 finding(s)", TEXT, duration=600)
     reveal("Summary: no findings", MUTED, duration=600)
     reveal("Result: PASS (no finding at or above high)", GREEN, duration=950)

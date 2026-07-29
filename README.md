@@ -16,18 +16,17 @@ basic repository hygiene. Target plugin code is read as data: it is never import
 This is an unofficial community project. It is not affiliated with, endorsed by, or maintained
 by Nous Research.
 
-![20-second terminal demo of installing and running Hermes Plugin Guard](https://raw.githubusercontent.com/mauricemohr88-debug/hermes-plugin-guard/v0.1.2/docs/demo.gif)
+![20-second terminal demo of installing and running Hermes Plugin Guard](https://raw.githubusercontent.com/mauricemohr88-debug/hermes-plugin-guard/v0.1.3/docs/demo.gif)
 
 ## Five-minute beta test
 
 If you maintain or use a Hermes plugin, one local scan is enough to help improve the rules.
 Python 3.11 or newer and [pipx](https://pipx.pypa.io/stable/) are required.
 
-1. Install the v0.1.3 release directly from GitHub:
+1. Install the current release from PyPI:
 
    ```bash
-   pipx install \
-     "git+https://github.com/mauricemohr88-debug/hermes-plugin-guard.git@v0.1.3"
+   pipx install hermes-plugin-guard
    ```
 
 2. Scan your plugin without failing the command on findings:
@@ -45,15 +44,13 @@ The scan stays on your computer. `hpg` reads target files as data, does not impo
 target plugin code, makes no network requests, includes no telemetry, and uploads neither source
 code nor results. Do not paste private code, credentials, or unsanitized paths into a public issue.
 
-Once v0.1.3 is visible on
-[PyPI](https://pypi.org/project/hermes-plugin-guard/), the shorter installation command is:
+Already installed? Use `pipx upgrade hermes-plugin-guard`. For a reproducible installation
+directly from the tagged source, install the v0.1.3 GitHub release:
 
 ```bash
-pipx install hermes-plugin-guard
+pipx install \
+  "git+https://github.com/mauricemohr88-debug/hermes-plugin-guard.git@v0.1.3"
 ```
-
-Already installed? Use `pipx upgrade hermes-plugin-guard` for a PyPI installation, or reinstall
-the tagged GitHub URL above.
 
 ## Why this exists
 
@@ -77,19 +74,19 @@ The scanner is designed to make high-risk patterns visible, including:
 
 Python 3.11 or newer is required.
 
-Install the current release directly from GitHub with
+Install the current release from
+[PyPI](https://pypi.org/project/hermes-plugin-guard/) with
 [pipx](https://pipx.pypa.io/stable/) (recommended for command-line tools):
+
+```bash
+pipx install hermes-plugin-guard
+```
+
+Alternatively, install reproducibly from the tagged GitHub source:
 
 ```bash
 pipx install \
   "git+https://github.com/mauricemohr88-debug/hermes-plugin-guard.git@v0.1.3"
-```
-
-After the release is published to
-[PyPI](https://pypi.org/project/hermes-plugin-guard/), install it by package name:
-
-```bash
-pipx install hermes-plugin-guard
 ```
 
 Or install from a local checkout:
