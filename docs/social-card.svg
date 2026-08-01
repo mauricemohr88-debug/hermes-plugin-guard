@@ -75,7 +75,7 @@
       <text x="197" y="0" fill="#b9d1cc" font-size="18">Zero target execution</text>
       <circle cx="440" cy="-7" r="7" fill="#49e6b1"/>
       <text x="457" y="0" fill="#b9d1cc" font-size="18">JSON + SARIF + GitHub Actions</text>
-      <text x="1048" y="0" fill="#73b7a5" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="16" text-anchor="end">MIT · v0.1.3</text>
+      <text x="1048" y="0" fill="#73b7a5" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="16" text-anchor="end">MIT · v0.1.4</text>
     </g>
   </g>
 </svg>

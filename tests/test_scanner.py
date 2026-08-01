@@ -90,6 +90,20 @@ def test_scanner_does_not_follow_file_symlinks_outside_root(tmp_path: Path) -> N
     assert "HPG201" not in {finding.rule_id for finding in result.findings}
 
 
+def test_symlinks_in_ignored_directories_are_not_reported(tmp_path: Path) -> None:
+    external = tmp_path / "external-python"
+    external.write_text("#!/usr/bin/env python\n", encoding="utf-8")
+    plugin = make_clean_plugin(tmp_path / "plugin")
+    ignored_bin = plugin / ".venv" / "bin"
+    ignored_bin.mkdir(parents=True)
+    (ignored_bin / "python").symlink_to(external)
+    (ignored_bin / "broken-python").symlink_to(tmp_path / "missing-python")
+
+    result = scan(plugin)
+
+    assert result.findings == []
+
+
 def test_excluded_rules_are_removed_after_analysis(risky_plugin: Path) -> None:
     result = scan(risky_plugin, excluded_rules=["hpg201", "HPG103"])
 

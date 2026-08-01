@@ -201,6 +201,8 @@ METADATA_HOSTS = {
     "metadata.google.internal",
 }
 CLEARTEXT_SCHEMES = {"ftp", "grpc", "http", "ws"}
+SAFE_YAML_LOADERS = {"yaml.CSafeLoader", "yaml.SafeLoader"}
+SAFE_YAML_SUBCLASS = "<safe-yaml-loader>"
 
 
 @dataclass(slots=True)
@@ -613,7 +615,12 @@ class _Analyzer(ast.NodeVisitor):
             self.visit(base)
         for keyword in node.keywords:
             self.visit(keyword.value)
-        self._current_alias_scope()[node.name] = None
+        is_safe_yaml_subclass = not node.decorator_list and any(
+            self._is_safe_yaml_loader_reference(base) for base in node.bases
+        )
+        self._current_alias_scope()[node.name] = (
+            SAFE_YAML_SUBCLASS if is_safe_yaml_subclass else None
+        )
         self._current_network_scope()[node.name] = None
         self._class_alias_scopes.append({})
         self._class_network_instance_scopes.append({})
@@ -1054,22 +1061,14 @@ class _Analyzer(ast.NodeVisitor):
             names.add(arguments.kwarg.arg)
         return names
 
-    @staticmethod
-    def _uses_safe_yaml_loader(node: ast.Call) -> bool:
+    def _uses_safe_yaml_loader(self, node: ast.Call) -> bool:
         for keyword in node.keywords:
             if keyword.arg in {"Loader", "loader"}:
-                value = keyword.value
-                if isinstance(value, ast.Attribute) and value.attr in {
-                    "SafeLoader",
-                    "CSafeLoader",
-                }:
-                    return True
-                if isinstance(value, ast.Name) and value.id in {
-                    "SafeLoader",
-                    "CSafeLoader",
-                }:
-                    return True
+                return self._is_safe_yaml_loader_reference(keyword.value)
         return False
+
+    def _is_safe_yaml_loader_reference(self, node: ast.AST) -> bool:
+        return self._qualified_name(node) in SAFE_YAML_LOADERS | {SAFE_YAML_SUBCLASS}
 
     @staticmethod
     def _keyword_is_true(node: ast.Call, keyword_name: str) -> bool:

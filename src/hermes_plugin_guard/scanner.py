@@ -192,6 +192,12 @@ def _symlink_findings(plugin_root: Path, repository_root: Path) -> list[Finding]
         if not path.is_symlink():
             continue
         try:
+            relative_parts = path.relative_to(plugin_root).parts
+        except ValueError:
+            continue
+        if _ignored_parts(relative_parts):
+            continue
+        try:
             path.resolve(strict=True).relative_to(plugin_root.resolve())
         except (FileNotFoundError, OSError, ValueError):
             rule = get_rule("HPG002")
