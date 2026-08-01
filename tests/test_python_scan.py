@@ -206,7 +206,7 @@ def test_network_alias_tls_listener_and_declared_environment_handling(
     assert "HPG105" in ids
 
 
-def test_safe_yaml_loader_and_regular_subprocess_definition_do_not_overreport(
+def test_safe_yaml_loader_and_verified_subclasses_do_not_overreport(
     tmp_path: Path,
 ) -> None:
     inspection = _inspect(
@@ -214,14 +214,66 @@ def test_safe_yaml_loader_and_regular_subprocess_definition_do_not_overreport(
         "\n".join(
             [
                 "import yaml",
+                "from yaml import SafeLoader as ImportedSafeLoader",
+                "class UniqueSafeLoader(yaml.SafeLoader):",
+                "    pass",
+                "class ImportedSubclass(ImportedSafeLoader):",
+                "    pass",
+                "class TransitiveSafeLoader(UniqueSafeLoader):",
+                "    pass",
+                "class FastSafeLoader(yaml.CSafeLoader):",
+                "    pass",
                 "def parse(blob):",
-                "    return yaml.load(blob, Loader=yaml.SafeLoader)",
+                "    return [",
+                "        yaml.load(blob, Loader=yaml.SafeLoader),",
+                "        yaml.load(blob, Loader=UniqueSafeLoader),",
+                "        yaml.load(blob, Loader=ImportedSubclass),",
+                "        yaml.load(blob, Loader=TransitiveSafeLoader),",
+                "        yaml.load(blob, Loader=FastSafeLoader),",
+                "    ]",
                 "",
             ]
         ),
     )
 
     assert "HPG102" not in {finding.rule_id for finding in inspection.findings}
+
+
+def test_unverified_or_rebound_yaml_loaders_remain_reported(tmp_path: Path) -> None:
+    inspection = _inspect(
+        tmp_path,
+        "\n".join(
+            [
+                "import evil",
+                "import yaml",
+                "def replace(cls):",
+                "    return object",
+                "class SafeLoader:",
+                "    pass",
+                "class UnsafeSubclass(yaml.Loader):",
+                "    pass",
+                "@replace",
+                "class DecoratedSafeSubclass(yaml.SafeLoader):",
+                "    pass",
+                "class ReboundSafeSubclass(yaml.SafeLoader):",
+                "    pass",
+                "ReboundSafeSubclass = object",
+                "def parse(blob):",
+                "    return [",
+                "        yaml.load(blob, Loader=SafeLoader),",
+                "        yaml.load(blob, Loader=UnsafeSubclass),",
+                "        yaml.load(blob, Loader=evil.SafeLoader),",
+                "        yaml.load(blob, Loader=DecoratedSafeSubclass),",
+                "        yaml.load(blob, Loader=ReboundSafeSubclass),",
+                "    ]",
+                "",
+            ]
+        ),
+    )
+
+    unsafe_yaml = [finding for finding in inspection.findings if finding.rule_id == "HPG102"]
+
+    assert len(unsafe_yaml) == 5
 
 
 def test_privileged_surfaces_and_literal_hooks_are_recorded(tmp_path: Path) -> None:

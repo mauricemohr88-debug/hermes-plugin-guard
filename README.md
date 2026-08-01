@@ -16,7 +16,7 @@ basic repository hygiene. Target plugin code is read as data: it is never import
 This is an unofficial community project. It is not affiliated with, endorsed by, or maintained
 by Nous Research.
 
-![20-second terminal demo of installing and running Hermes Plugin Guard](https://raw.githubusercontent.com/mauricemohr88-debug/hermes-plugin-guard/v0.1.3/docs/demo.gif)
+![20-second terminal demo of installing and running Hermes Plugin Guard](https://raw.githubusercontent.com/mauricemohr88-debug/hermes-plugin-guard/v0.1.4/docs/demo.gif)
 
 ## Five-minute beta test
 
@@ -45,11 +45,11 @@ target plugin code, makes no network requests, includes no telemetry, and upload
 code nor results. Do not paste private code, credentials, or unsanitized paths into a public issue.
 
 Already installed? Use `pipx upgrade hermes-plugin-guard`. For a reproducible installation
-directly from the tagged source, install the v0.1.3 GitHub release:
+directly from the tagged source, install the v0.1.4 GitHub release:
 
 ```bash
 pipx install \
-  "git+https://github.com/mauricemohr88-debug/hermes-plugin-guard.git@v0.1.3"
+  "git+https://github.com/mauricemohr88-debug/hermes-plugin-guard.git@v0.1.4"
 ```
 
 ## Why this exists
@@ -86,7 +86,7 @@ Alternatively, install reproducibly from the tagged GitHub source:
 
 ```bash
 pipx install \
-  "git+https://github.com/mauricemohr88-debug/hermes-plugin-guard.git@v0.1.3"
+  "git+https://github.com/mauricemohr88-debug/hermes-plugin-guard.git@v0.1.4"
 ```
 
 Or install from a local checkout:
@@ -182,7 +182,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: mauricemohr88-debug/hermes-plugin-guard@v0.1.3
+      - uses: mauricemohr88-debug/hermes-plugin-guard@v0.1.4
         with:
           path: path/to/plugin
           fail-on: high

@@ -7,6 +7,22 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.1.4] - 2026-08-01
+
+### Added
+
+- Run pinned CodeQL analysis for the production Python package on pull requests, pushes to
+  `main`, and a weekly schedule.
+
+### Fixed
+
+- Apply the existing ignored-directory policy to symlink validation so virtual-environment and
+  other non-production symlinks do not produce `HPG002` findings, while out-of-root symlinks in
+  scanned plugin paths remain blocked and reported.
+- Recognize only statically verified subclasses of `yaml.SafeLoader` and `yaml.CSafeLoader` as safe
+  `yaml.load()` loaders, removing a false positive without trusting lookalike, decorated, unsafe,
+  or rebound loader classes.
+
 ## [0.1.3] - 2026-07-28
 
 ### Added
@@ -79,7 +95,8 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Configurable failure thresholds and per-rule command-line exclusions.
 - Composite GitHub Action and pinned continuous-integration workflow.
 
-[Unreleased]: https://github.com/mauricemohr88-debug/hermes-plugin-guard/compare/v0.1.3...HEAD
+[Unreleased]: https://github.com/mauricemohr88-debug/hermes-plugin-guard/compare/v0.1.4...HEAD
+[0.1.4]: https://github.com/mauricemohr88-debug/hermes-plugin-guard/compare/v0.1.3...v0.1.4
 [0.1.3]: https://github.com/mauricemohr88-debug/hermes-plugin-guard/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/mauricemohr88-debug/hermes-plugin-guard/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/mauricemohr88-debug/hermes-plugin-guard/compare/v0.1.0...v0.1.1
