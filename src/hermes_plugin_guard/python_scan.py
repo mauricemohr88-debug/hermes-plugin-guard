@@ -209,6 +209,7 @@ SAFE_YAML_SUBCLASS = "<safe-yaml-loader>"
 class PythonInspection:
     findings: list[Finding]
     literal_hooks: dict[str, tuple[str, int]]
+    finding_limit_reached: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -231,10 +232,13 @@ class _Analyzer(ast.NodeVisitor):
         relative_path: str,
         declared_env: set[str],
         docstring_nodes: set[int],
+        max_findings: int | None = None,
     ) -> None:
         self.relative_path = relative_path
         self.declared_env = declared_env
         self.docstring_nodes = docstring_nodes
+        self.max_findings = max_findings
+        self.finding_limit_reached = False
         self.findings: list[Finding] = []
         self.literal_hooks: dict[str, tuple[str, int]] = {}
         self._alias_scopes: list[dict[str, str | None]] = [{}]
@@ -245,6 +249,11 @@ class _Analyzer(ast.NodeVisitor):
         self._network_instance_scopes: list[dict[str, _NetworkInstance | None]] = [{}]
         self._class_network_instance_scopes: list[dict[str, _NetworkInstance | None]] = []
 
+    def visit(self, node: ast.AST) -> None:
+        if self.finding_limit_reached:
+            return None
+        return super().visit(node)
+
     def add(
         self,
         rule_id: str,
@@ -254,6 +263,9 @@ class _Analyzer(ast.NodeVisitor):
         severity: Severity | None = None,
         evidence: str | None = None,
     ) -> None:
+        if self.max_findings is not None and len(self.findings) >= self.max_findings:
+            self.finding_limit_reached = True
+            return
         rule = get_rule(rule_id)
         self.findings.append(
             Finding(
@@ -1582,6 +1594,8 @@ def inspect_python(
     path: Path,
     repository_root: Path,
     declared_env: set[str],
+    *,
+    max_findings: int | None = None,
 ) -> PythonInspection:
     relative = _relative(path, repository_root)
     try:
@@ -1627,9 +1641,13 @@ def inspect_python(
         and isinstance(statement.value, ast.Constant)
         and isinstance(statement.value.value, str)
     }
-    analyzer = _Analyzer(relative, declared_env, docstring_nodes)
+    analyzer = _Analyzer(relative, declared_env, docstring_nodes, max_findings=max_findings)
     analyzer.visit(tree)
-    return PythonInspection(analyzer.findings, analyzer.literal_hooks)
+    return PythonInspection(
+        analyzer.findings,
+        analyzer.literal_hooks,
+        finding_limit_reached=analyzer.finding_limit_reached,
+    )
 
 
 def _relative(path: Path, root: Path) -> str:

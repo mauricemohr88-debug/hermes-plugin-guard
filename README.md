@@ -16,7 +16,7 @@ basic repository hygiene. Target plugin code is read as data: it is never import
 This is an unofficial community project. It is not affiliated with, endorsed by, or maintained
 by Nous Research.
 
-![20-second terminal demo of installing and running Hermes Plugin Guard](https://raw.githubusercontent.com/mauricemohr88-debug/hermes-plugin-guard/v0.1.4/docs/demo.gif)
+![20-second CLI demo recorded with Hermes Plugin Guard v0.1.4](https://raw.githubusercontent.com/mauricemohr88-debug/hermes-plugin-guard/v0.1.4/docs/demo.gif)
 
 ## Five-minute beta test
 
@@ -40,16 +40,18 @@ Python 3.11 or newer and [pipx](https://pipx.pypa.io/stable/) are required.
    with the rule IDs that were useful, noisy, or missing. A public plugin URL is helpful but not
    required.
 
-The scan stays on your computer. `hpg` reads target files as data, does not import or execute
-target plugin code, makes no network requests, includes no telemetry, and uploads neither source
-code nor results. Do not paste private code, credentials, or unsanitized paths into a public issue.
+The standalone `hpg` scan stays on your computer. It reads target files as data, does not import
+or execute target plugin code, makes no network requests, includes no telemetry, and uploads
+neither source code nor results. The optional native Hermes tool has a different, explicitly
+documented privacy boundary below. Do not paste private code, credentials, or unsanitized paths
+into a public issue.
 
 Already installed? Use `pipx upgrade hermes-plugin-guard`. For a reproducible installation
-directly from the tagged source, install the v0.1.4 GitHub release:
+directly from the tagged source, install the v0.2.0 GitHub release:
 
 ```bash
 pipx install \
-  "git+https://github.com/mauricemohr88-debug/hermes-plugin-guard.git@v0.1.4"
+  "git+https://github.com/mauricemohr88-debug/hermes-plugin-guard.git@v0.2.0"
 ```
 
 ## Why this exists
@@ -86,7 +88,7 @@ Alternatively, install reproducibly from the tagged GitHub source:
 
 ```bash
 pipx install \
-  "git+https://github.com/mauricemohr88-debug/hermes-plugin-guard.git@v0.1.4"
+  "git+https://github.com/mauricemohr88-debug/hermes-plugin-guard.git@v0.2.0"
 ```
 
 Or install from a local checkout:
@@ -98,6 +100,52 @@ python -m pip install .
 ```
 
 Both `hpg` and `hermes-plugin-guard` invoke the same command.
+
+## Native Hermes v0.20 integration
+
+Hermes Plugin Guard can also be installed as a native, review-only Hermes plugin from Git. Keep
+it disabled during installation, then enable the guard itself without granting tool-override
+permission:
+
+```bash
+hermes plugins install mauricemohr88-debug/hermes-plugin-guard --no-enable
+hermes plugins enable hermes-plugin-guard --no-allow-tool-override
+```
+
+In a new Hermes process you can use the operator CLI:
+
+```bash
+hermes plugin-guard rules
+hermes plugin-guard scan /path/to/a/plugin --fail-on high
+```
+
+The safest manual review sequence for another Git plugin is:
+
+```bash
+hermes plugins install owner/repository --no-enable
+hermes plugin-guard installed plugin-name --fail-on high
+hermes plugins enable plugin-name --no-allow-tool-override
+```
+
+Hermes also receives one read-only model tool, `plugin_guard_review_candidate`. It accepts only an
+installed plugin key below `HERMES_HOME/plugins`, refuses currently enabled plugins, applies fixed
+high-severity policy, and returns at most 20 findings. The strict native path scans runtime-capable
+directories such as `tests`, `build`, and `generated`, rejects unsupported executable binaries,
+and runs the analyzer in a single resource-bounded worker. Its response contains only rule IDs,
+severity, opaque location IDs, bounded line numbers, and bounded counts; it omits filenames,
+source, finding messages, evidence, dependency strings, secrets, internal tree digests, and
+absolute paths. That bounded response becomes part of the active Hermes conversation and may
+therefore be sent to the configured model provider. Exclusive, model-provider, and
+Hermes-detected legacy memory or cron-scheduler plugins use separate activation paths. Those
+candidates are rejected by this tool rather than being incorrectly described as disabled.
+
+This integration does **not** intercept or replace Hermes' native install, update, enable, or load
+paths. Hermes v0.20 has no third-party plugin-admission hook, so the guard cannot honestly enforce
+a scan before every activation. The native surface is a convenient review step; the operator still
+makes the activation decision. Its private before/after digest detects endpoint changes during a
+review, but it is not an atomic filesystem snapshot or sandbox. A generic
+[upstream admission-policy proposal](https://github.com/NousResearch/hermes-agent/issues/64182#issuecomment-5078498045)
+is already registered with the Hermes plugin-interface tracker.
 
 ## Usage
 
@@ -182,7 +230,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: mauricemohr88-debug/hermes-plugin-guard@v0.1.4
+      - uses: mauricemohr88-debug/hermes-plugin-guard@v0.2.0
         with:
           path: path/to/plugin
           fail-on: high

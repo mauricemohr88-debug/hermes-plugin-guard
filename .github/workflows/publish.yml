@@ -37,6 +37,7 @@ jobs:
           python - <<'PY'
           import ast
           import os
+          import re
           import tomllib
           from pathlib import Path
 
@@ -71,6 +72,19 @@ jobs:
               raise SystemExit(
                   f"module version {module_version!r} does not match project version "
                   f"{project_version!r}"
+              )
+
+          manifest_text = Path("plugin.yaml").read_text(encoding="utf-8")
+          manifest_match = re.search(
+              r'^version:\s*["\']?([^"\'\s]+)["\']?\s*$',
+              manifest_text,
+              re.MULTILINE,
+          )
+          manifest_version = manifest_match.group(1) if manifest_match else None
+          if manifest_version != project_version:
+              raise SystemExit(
+                  f"plugin manifest version {manifest_version!r} does not match "
+                  f"project version {project_version!r}"
               )
           PY
 

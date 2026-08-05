@@ -7,6 +7,30 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-08-05
+
+### Added
+
+- Add a native Hermes v0.20 directory-plugin entry point with `hermes plugin-guard scan`,
+  `installed`, and `rules` operator commands while preserving the existing `hpg` CLI.
+- Add the read-only `plugin_guard_review_candidate` model tool for installed, disabled plugins.
+- Bind the native model-tool review to private before-and-after endpoint digests and reject
+  traversal, symlinks, special files, executable binaries, oversized trees, excessive depth,
+  unreadable activation state, and endpoint changes detected during review.
+
+### Security
+
+- Restrict the model tool to canonical candidates below `HERMES_HOME/plugins`; arbitrary paths,
+  enabled plugins, rule exclusions, output files, and threshold overrides are not exposed.
+- Return only a bounded projection of findings, omitting source, messages, evidence, dependency
+  strings, filenames, secrets, internal digests, and absolute paths from the model conversation.
+- Run strict native scans in a single resource-bounded worker, include runtime-capable directories
+  that the general-purpose CLI normally ignores, and fail closed when analysis is incomplete.
+- Reject plugin families that Hermes can load through memory, cron-scheduler, or model-provider
+  paths outside the general `plugins.enabled` allow-list.
+- Document that the native integration is a review aid rather than an install or activation gate;
+  Hermes v0.20 does not expose a plugin-admission lifecycle hook.
+
 ## [0.1.4] - 2026-08-01
 
 ### Added
@@ -95,7 +119,8 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Configurable failure thresholds and per-rule command-line exclusions.
 - Composite GitHub Action and pinned continuous-integration workflow.
 
-[Unreleased]: https://github.com/mauricemohr88-debug/hermes-plugin-guard/compare/v0.1.4...HEAD
+[Unreleased]: https://github.com/mauricemohr88-debug/hermes-plugin-guard/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/mauricemohr88-debug/hermes-plugin-guard/compare/v0.1.4...v0.2.0
 [0.1.4]: https://github.com/mauricemohr88-debug/hermes-plugin-guard/compare/v0.1.3...v0.1.4
 [0.1.3]: https://github.com/mauricemohr88-debug/hermes-plugin-guard/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/mauricemohr88-debug/hermes-plugin-guard/compare/v0.1.1...v0.1.2

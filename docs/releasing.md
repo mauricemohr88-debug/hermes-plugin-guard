@@ -35,7 +35,8 @@ distribution.
 
 ## Release checklist
 
-1. Update the version in `pyproject.toml` and `src/hermes_plugin_guard/__init__.py`.
+1. Update the version in `pyproject.toml`, `src/hermes_plugin_guard/__init__.py`, and
+   `plugin.yaml`.
 2. Move the relevant changelog entries from `Unreleased` into the dated release section.
 3. Run the local release checks:
 
@@ -50,7 +51,7 @@ distribution.
 
 4. Merge the release commit and wait for CI to pass on the default branch.
 5. Create and publish a GitHub Release using a matching `vMAJOR.MINOR.PATCH` tag. For package
-   version `0.1.1`, the tag must be `v0.1.1`.
+   version `0.2.0`, the tag must be `v0.2.0`.
 6. Confirm that the `Publish to PyPI` workflow completed successfully. When publishing is enabled,
    also confirm that the project page lists both the wheel and source distribution. Before then,
    the publish job should show as skipped.
@@ -60,9 +61,9 @@ distribution.
    pipx run hermes-plugin-guard --version
    ```
 
-The workflow rejects mismatched release tags, `pyproject.toml` versions, and module versions. It
-also reruns linting and tests, validates distribution metadata, and separates the unprivileged
-build job from the OIDC-enabled publish job.
+The workflow rejects mismatched release tags, `pyproject.toml` versions, module versions, and
+native `plugin.yaml` versions. It also reruns linting and tests, validates distribution metadata,
+and separates the unprivileged build job from the OIDC-enabled publish job.
 
 ## Recovery
 

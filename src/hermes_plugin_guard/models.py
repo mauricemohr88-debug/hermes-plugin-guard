@@ -85,6 +85,7 @@ class ScanResult:
     scanned_files: int = 0
     plugin_count: int = 0
     skipped_files: int = 0
+    finding_limit_reached: bool = False
 
     def sorted_findings(self) -> list[Finding]:
         return sorted(
@@ -108,7 +109,9 @@ class ScanResult:
     def fails_at(self, threshold: Severity | None) -> bool:
         if threshold is None:
             return False
-        return any(finding.severity >= threshold for finding in self.findings)
+        return self.finding_limit_reached or any(
+            finding.severity >= threshold for finding in self.findings
+        )
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -120,6 +123,7 @@ class ScanResult:
                 "scanned_files": self.scanned_files,
                 "skipped_files": self.skipped_files,
                 "findings": len(self.findings),
+                "finding_limit_reached": self.finding_limit_reached,
                 "counts": self.counts(),
             },
             "findings": [finding.as_dict() for finding in self.sorted_findings()],
