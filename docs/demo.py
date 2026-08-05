@@ -140,14 +140,14 @@ def main() -> None:
     pause(450, cursor=True)
     type_line("$ pipx install hermes-plugin-guard", CYAN, step=1, delay=80)
     pause(850, cursor=True)
-    reveal("  installed package hermes-plugin-guard 0.1.4", MUTED, duration=650)
+    reveal("  installed package hermes-plugin-guard 0.2.0", MUTED, duration=650)
     reveal("  apps now available: hpg, hermes-plugin-guard", GREEN, duration=850)
     reveal("", duration=350)
 
     # The report below is the exact text format produced by the safe fixture.
     type_line("$ hpg scan ~/.hermes/plugins/my-plugin", CYAN, step=1, delay=70)
     pause(1_150, cursor=True)
-    reveal("hermes-plugin-guard 0.1.4", MUTED, duration=500)
+    reveal("hermes-plugin-guard 0.2.0", MUTED, duration=500)
     reveal("Scanned 1 plugin(s), 4 file(s) — 0 finding(s)", TEXT, duration=600)
     reveal("Summary: no findings", MUTED, duration=600)
     reveal("Result: PASS (no finding at or above high)", GREEN, duration=950)

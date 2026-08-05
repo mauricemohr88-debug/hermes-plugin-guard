@@ -1,0 +1,8 @@
+manifest_version: 1
+name: hermes-plugin-guard
+version: "0.2.0"
+description: "Static review of candidate Hermes plugins; target code is never executed."
+author: "Maurice Mohr"
+kind: standalone
+provides_tools:
+  - plugin_guard_review_candidate

@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 from conftest import make_clean_plugin
 
-from hermes_plugin_guard import scan
+from hermes_plugin_guard import Severity, scan
 
 
 def test_safe_fixture_has_no_findings(safe_plugin: Path) -> None:
@@ -185,6 +185,38 @@ def test_non_production_directories_are_not_behavior_or_secret_scanned(
         ("HPG103", "runtime.py"),
         ("HPG201", "runtime.py"),
     }
+
+
+def test_disabling_default_ignores_scans_importable_code_under_tests(tmp_path: Path) -> None:
+    plugin = make_clean_plugin(tmp_path / "plugin")
+    tests = plugin / "tests"
+    (tests / "test_importable_payload.py").write_text("eval('1 + 1')\n", encoding="utf-8")
+
+    result = scan(plugin, use_default_ignores=False)
+
+    assert any(
+        finding.rule_id == "HPG101" and finding.path == "tests/test_importable_payload.py"
+        for finding in result.findings
+    )
+
+
+@pytest.mark.parametrize(
+    ("source_count", "limit", "expected_reached"),
+    [(3, 3, False), (4, 3, True)],
+)
+def test_finding_budget_is_exact_and_fails_closed(
+    tmp_path: Path, source_count: int, limit: int, expected_reached: bool
+) -> None:
+    plugin = make_clean_plugin(tmp_path / "plugin")
+    source = "\n".join(f"eval(value_{index})" for index in range(source_count)) + "\n"
+    (plugin / "many_findings.py").write_text(source, encoding="utf-8")
+
+    result = scan(plugin, use_default_ignores=False, max_findings=limit)
+
+    assert len(result.findings) == limit
+    assert result.finding_limit_reached is expected_reached
+    assert result.fails_at(None) is False
+    assert result.fails_at(Severity.CRITICAL) is expected_reached
 
 
 def test_nested_src_layout_is_discovered_without_root_manifest(tmp_path: Path) -> None:
