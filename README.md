@@ -16,7 +16,10 @@ basic repository hygiene. Target plugin code is read as data: it is never import
 This is an unofficial community project. It is not affiliated with, endorsed by, or maintained
 by Nous Research.
 
-![20-second CLI demo recorded with Hermes Plugin Guard v0.1.4](https://raw.githubusercontent.com/mauricemohr88-debug/hermes-plugin-guard/v0.1.4/docs/demo.gif)
+Read the engineering note:
+[I turned a Hermes plugin scanner into a Hermes plugin. It still cannot be an admission gate.](docs/plugin-admission-boundary.md)
+
+![20-second CLI demo recorded with Hermes Plugin Guard v0.2.0](https://raw.githubusercontent.com/mauricemohr88-debug/hermes-plugin-guard/main/docs/demo.gif)
 
 ## Five-minute beta test
 

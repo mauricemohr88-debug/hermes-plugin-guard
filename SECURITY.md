@@ -6,7 +6,8 @@ Security fixes are provided for the latest released minor version.
 
 | Version | Supported |
 | --- | --- |
-| 0.1.x | Yes |
+| 0.2.x | Yes |
+| 0.1.x | No |
 | Earlier or unreleased snapshots | No |
 
 Before reporting, please reproduce the issue against the latest release or the default branch
