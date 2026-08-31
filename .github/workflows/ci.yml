@@ -85,7 +85,7 @@ jobs:
           cache: pip
 
       - name: Install scanner dependencies
-        run: python -m pip install --disable-pip-version-check -e .
+        run: python -m pip install --disable-pip-version-check -e ".[dev]"
 
       - name: Require a safe native install verdict
         env:
