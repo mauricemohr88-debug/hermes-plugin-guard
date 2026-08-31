@@ -51,9 +51,18 @@ The same repository can now be installed as a native Hermes plugin while still
 remaining useful as a standalone CLI:
 
 ```bash
-hermes plugins install mauricemohr88-debug/hermes-plugin-guard --no-enable
+hermes plugins install mauricemohr88-debug/hermes-plugin-guard/src --no-enable
 hermes plugins enable hermes-plugin-guard --no-allow-tool-override
 ```
+
+Compatibility update: Hermes v0.20.5 added a host-owned install scanner. The repository contains
+intentionally adversarial fixtures for testing this scanner, so current releases install the slim
+runtime tree through the `/src` suffix shown above. This keeps the original no-duplication design:
+the native shim and packaged CLI still use the same implementation. Because Hermes v0.20.5 and
+v0.20.6 do not retain Git metadata for subdirectory installs, first run
+`hermes plugins disable hermes-plugin-guard`, then reinstall with
+`hermes plugins install mauricemohr88-debug/hermes-plugin-guard/src --force --no-enable` and review
+before enabling it again. `--no-enable` alone does not disable an already enabled installation.
 
 Operators receive three commands:
 
@@ -128,8 +137,10 @@ analysis, but only the host can provide universal admission authority.
 
 The v0.2.0 release passed 162 tests across Python 3.11, 3.12, and 3.13, plus Ruff,
 CodeQL, wheel and source builds, and a loader test against Hermes tag
-`v2026.8.3` / v0.20.0. Those checks establish what was tested. They do not turn
-a heuristic scanner into a malware detector or a security guarantee.
+`v2026.8.3` / v0.20.0. The v0.2.1 compatibility patch additionally checks the
+runtime-only install tree against the host scanners from Hermes v0.20.5 and
+v0.20.6. Those checks establish what was tested. They do not turn a heuristic
+scanner into a malware detector or a security guarantee.
 
 If you maintain or use a Hermes plugin, the most useful next result is one real
 scan:

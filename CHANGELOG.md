@@ -7,6 +7,29 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-08-31
+
+### Added
+
+- Add a slim native Hermes plugin entry point under `src/` and a standard
+  `hermes_agent.plugins` package entry point, without duplicating the scanner implementation.
+- Check the native install tree against the built-in scanners from Hermes v0.20.5 and v0.20.6 in
+  CI so future installer-policy changes are visible before release.
+
+### Fixed
+
+- Restore native Git installation on Hermes v0.20.5 and v0.20.6 by scanning only the runtime
+  subtree. The full development repository intentionally contains adversarial security fixtures
+  that the Hermes installer correctly refuses to install.
+- Rewrite the remote-shell detector's equivalent `/usr/bin/env` expression so Hermes' own
+  install scanner no longer mistakes the detector source for environment-variable exfiltration.
+
+### Changed
+
+- Document that Git subdirectory installations must be disabled and then force-reinstalled because
+  current Hermes releases do not retain the repository metadata required by
+  `hermes plugins update`; `--no-enable` alone does not disable an already enabled plugin.
+
 ## [0.2.0] - 2026-08-05
 
 ### Added
@@ -119,7 +142,8 @@ uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Configurable failure thresholds and per-rule command-line exclusions.
 - Composite GitHub Action and pinned continuous-integration workflow.
 
-[Unreleased]: https://github.com/mauricemohr88-debug/hermes-plugin-guard/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/mauricemohr88-debug/hermes-plugin-guard/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/mauricemohr88-debug/hermes-plugin-guard/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/mauricemohr88-debug/hermes-plugin-guard/compare/v0.1.4...v0.2.0
 [0.1.4]: https://github.com/mauricemohr88-debug/hermes-plugin-guard/compare/v0.1.3...v0.1.4
 [0.1.3]: https://github.com/mauricemohr88-debug/hermes-plugin-guard/compare/v0.1.2...v0.1.3

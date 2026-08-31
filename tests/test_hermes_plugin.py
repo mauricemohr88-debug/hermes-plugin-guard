@@ -9,6 +9,8 @@ import importlib.util
 import json
 import shutil
 import sys
+import tomllib
+from importlib import metadata
 from pathlib import Path
 from types import ModuleType
 from typing import Any
@@ -480,25 +482,65 @@ def test_native_operator_cli_scans_an_installed_plugin(
     assert report["summary"]["counts"]["high"] == 0
 
 
-def test_root_shim_loads_with_hermes_style_spec_and_manifest_is_consistent(
+@pytest.mark.parametrize(
+    ("plugin_root", "module_name"),
+    [
+        (REPOSITORY, "isolated_hermes_plugin_root"),
+        (REPOSITORY / "src", "isolated_hermes_plugin_src"),
+    ],
+)
+def test_native_shims_load_with_hermes_style_spec_and_manifests_are_consistent(
     adapter: ModuleType,
+    plugin_root: Path,
+    module_name: str,
 ) -> None:
     spec = importlib.util.spec_from_file_location(
-        "isolated_hermes_plugin",
-        REPOSITORY / "__init__.py",
-        submodule_search_locations=[str(REPOSITORY)],
+        module_name,
+        plugin_root / "__init__.py",
+        submodule_search_locations=[str(plugin_root)],
     )
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module
     try:
         spec.loader.exec_module(module)
-        assert module.register
-        manifest = yaml.safe_load((REPOSITORY / "plugin.yaml").read_text(encoding="utf-8"))
+        context = RecordingContext()
+        module.register(context)
+        manifest = yaml.safe_load((plugin_root / "plugin.yaml").read_text(encoding="utf-8"))
     finally:
-        sys.modules.pop(spec.name, None)
+        for loaded_name in list(sys.modules):
+            if loaded_name == spec.name or loaded_name.startswith(f"{spec.name}."):
+                sys.modules.pop(loaded_name, None)
 
     package = importlib.import_module("hermes_plugin_guard")
+    assert [tool["name"] for tool in context.tools] == [adapter.TOOL_NAME]
+    assert [command["name"] for command in context.commands] == [adapter.CLI_NAME]
     assert manifest["provides_tools"] == [adapter.TOOL_NAME]
     assert manifest["version"] == package.__version__
     assert manifest["name"] == "hermes-plugin-guard"
+
+
+def test_native_manifests_and_package_entry_point_stay_in_sync() -> None:
+    root_manifest = yaml.safe_load((REPOSITORY / "plugin.yaml").read_text(encoding="utf-8"))
+    src_manifest = yaml.safe_load((REPOSITORY / "src" / "plugin.yaml").read_text(encoding="utf-8"))
+    project = tomllib.loads((REPOSITORY / "pyproject.toml").read_text(encoding="utf-8"))
+    package = importlib.import_module("hermes_plugin_guard")
+
+    assert src_manifest == root_manifest
+    assert root_manifest["version"] == project["project"]["version"] == package.__version__
+    entry_point_value = project["project"]["entry-points"]["hermes_agent.plugins"][
+        "hermes-plugin-guard"
+    ]
+    assert entry_point_value == "hermes_plugin_guard.hermes_plugin"
+    entry_point = metadata.EntryPoint(
+        name="hermes-plugin-guard",
+        value=entry_point_value,
+        group="hermes_agent.plugins",
+    )
+    loaded_module = entry_point.load()
+    context = RecordingContext()
+    loaded_module.register(context)
+    assert [tool["name"] for tool in context.tools] == ["plugin_guard_review_candidate"]
+    assert [command["name"] for command in context.commands] == ["plugin-guard"]
+    assert not (REPOSITORY / "src" / "tests").exists()
+    assert not (REPOSITORY / "src" / "fixtures").exists()

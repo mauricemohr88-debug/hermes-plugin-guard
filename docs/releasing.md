@@ -35,8 +35,8 @@ distribution.
 
 ## Release checklist
 
-1. Update the version in `pyproject.toml`, `src/hermes_plugin_guard/__init__.py`, and
-   `plugin.yaml`.
+1. Update the version in `pyproject.toml`, `src/hermes_plugin_guard/__init__.py`,
+   `plugin.yaml`, and `src/plugin.yaml`.
 2. Move the relevant changelog entries from `Unreleased` into the dated release section.
 3. Run the local release checks:
 
@@ -61,7 +61,7 @@ distribution.
    pipx run hermes-plugin-guard --version
    ```
 
-The workflow rejects mismatched release tags, `pyproject.toml` versions, module versions, and
+The workflow rejects mismatched release tags, `pyproject.toml` versions, module versions, and both
 native `plugin.yaml` versions. It also reruns linting and tests, validates distribution metadata,
 and separates the unprivileged build job from the OIDC-enabled publish job.
 
