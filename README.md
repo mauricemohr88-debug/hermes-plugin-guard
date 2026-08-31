@@ -50,11 +50,11 @@ documented privacy boundary below. Do not paste private code, credentials, or un
 into a public issue.
 
 Already installed? Use `pipx upgrade hermes-plugin-guard`. For a reproducible installation
-directly from the tagged source, install the v0.2.0 GitHub release:
+directly from the tagged source, install the v0.2.1 GitHub release:
 
 ```bash
 pipx install \
-  "git+https://github.com/mauricemohr88-debug/hermes-plugin-guard.git@v0.2.0"
+  "git+https://github.com/mauricemohr88-debug/hermes-plugin-guard.git@v0.2.1"
 ```
 
 ## Why this exists
@@ -91,7 +91,7 @@ Alternatively, install reproducibly from the tagged GitHub source:
 
 ```bash
 pipx install \
-  "git+https://github.com/mauricemohr88-debug/hermes-plugin-guard.git@v0.2.0"
+  "git+https://github.com/mauricemohr88-debug/hermes-plugin-guard.git@v0.2.1"
 ```
 
 Or install from a local checkout:
@@ -104,16 +104,38 @@ python -m pip install .
 
 Both `hpg` and `hermes-plugin-guard` invoke the same command.
 
-## Native Hermes v0.20 integration
+## Native Hermes v0.20.5+ integration
 
-Hermes Plugin Guard can also be installed as a native, review-only Hermes plugin from Git. Keep
-it disabled during installation, then enable the guard itself without granting tool-override
+Hermes Plugin Guard can also be installed as a native, review-only Hermes plugin from Git. The
+`/src` suffix is intentional: current Hermes releases scan that runtime-only subtree before
+installation, without including this project's deliberately adversarial test fixtures. Keep the
+plugin disabled during installation, then enable the guard itself without granting tool-override
 permission:
 
 ```bash
-hermes plugins install mauricemohr88-debug/hermes-plugin-guard --no-enable
+hermes plugins install mauricemohr88-debug/hermes-plugin-guard/src --no-enable
 hermes plugins enable hermes-plugin-guard --no-allow-tool-override
 ```
+
+Hermes v0.20.5 and v0.20.6 do not retain `.git` metadata for a subdirectory installation, so
+`hermes plugins update hermes-plugin-guard` cannot update this layout. Disable an existing
+installation **before** replacing its files; `--no-enable` by itself does not disable a plugin
+that is already enabled. Then reinstall the same reviewed source and enable it again only after
+review:
+
+```bash
+hermes plugins disable hermes-plugin-guard
+hermes plugins install mauricemohr88-debug/hermes-plugin-guard/src \
+  --force \
+  --no-enable
+hermes plugins enable hermes-plugin-guard --no-allow-tool-override
+```
+
+The package also advertises the standard `hermes_agent.plugins` entry point. That path is useful
+only when `hermes-plugin-guard` is installed into the **same Python environment as Hermes**;
+installing the standalone CLI with `pipx` intentionally uses a separate environment. Use either
+the Git subdirectory installation or the same-environment package entry point as the native
+plugin source, not both.
 
 In a new Hermes process you can use the operator CLI:
 
@@ -144,9 +166,10 @@ candidates are rejected by this tool rather than being incorrectly described as 
 
 This integration does **not** intercept or replace Hermes' native install, update, enable, or load
 paths. Hermes v0.20 has no third-party plugin-admission hook, so the guard cannot honestly enforce
-a scan before every activation. The native surface is a convenient review step; the operator still
-makes the activation decision. Its private before/after digest detects endpoint changes during a
-review, but it is not an atomic filesystem snapshot or sandbox. A generic
+a scan before every activation. Hermes' own install-time scanner is a separate host control. The
+native surface here is a convenient additional review step; the operator still makes the
+activation decision. Its private before/after digest detects endpoint changes during a review,
+but it is not an atomic filesystem snapshot or sandbox. A generic
 [upstream admission-policy proposal](https://github.com/NousResearch/hermes-agent/issues/64182#issuecomment-5078498045)
 is already registered with the Hermes plugin-interface tracker.
 
@@ -233,7 +256,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: mauricemohr88-debug/hermes-plugin-guard@v0.2.0
+      - uses: mauricemohr88-debug/hermes-plugin-guard@v0.2.1
         with:
           path: path/to/plugin
           fail-on: high

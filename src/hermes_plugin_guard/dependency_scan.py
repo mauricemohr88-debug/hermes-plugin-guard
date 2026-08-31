@@ -17,7 +17,7 @@ FULL_SHA_RE = re.compile(r"(?i)(?:@|/)[0-9a-f]{40}(?:[#?]|$)")
 NAME_RE = re.compile(r"^[A-Za-z0-9_.-]+")
 REMOTE_FETCH_RE = re.compile(r"(?i)\b(?:curl|wget)\b[^\n]*(?:https?://)")
 PIPE_TO_SHELL_RE = re.compile(
-    r"(?i)\|\s*(?:(?:/usr/bin/env|env)\s+)?(?:ba|da|fi|z)?sh\b"
+    r"(?i)\|\s*(?:(?:/usr/bin/)?env\s+)?(?:ba|da|fi|z)?sh\b"
     r"|\|\s*(?:iex|invoke-expression)\b"
 )
 

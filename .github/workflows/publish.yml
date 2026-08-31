@@ -74,18 +74,19 @@ jobs:
                   f"{project_version!r}"
               )
 
-          manifest_text = Path("plugin.yaml").read_text(encoding="utf-8")
-          manifest_match = re.search(
-              r'^version:\s*["\']?([^"\'\s]+)["\']?\s*$',
-              manifest_text,
-              re.MULTILINE,
-          )
-          manifest_version = manifest_match.group(1) if manifest_match else None
-          if manifest_version != project_version:
-              raise SystemExit(
-                  f"plugin manifest version {manifest_version!r} does not match "
-                  f"project version {project_version!r}"
+          for manifest_path in (Path("plugin.yaml"), Path("src/plugin.yaml")):
+              manifest_text = manifest_path.read_text(encoding="utf-8")
+              manifest_match = re.search(
+                  r'^version:\s*["\']?([^"\'\s]+)["\']?\s*$',
+                  manifest_text,
+                  re.MULTILINE,
               )
+              manifest_version = manifest_match.group(1) if manifest_match else None
+              if manifest_version != project_version:
+                  raise SystemExit(
+                      f"{manifest_path} version {manifest_version!r} does not match "
+                      f"project version {project_version!r}"
+                  )
           PY
 
       - name: Install release checks
