@@ -50,11 +50,11 @@ documented privacy boundary below. Do not paste private code, credentials, or un
 into a public issue.
 
 Already installed? Use `pipx upgrade hermes-plugin-guard`. For a reproducible installation
-directly from the tagged source, install the v0.2.1 GitHub release:
+directly from the tagged source, install the v0.2.2 GitHub release:
 
 ```bash
 pipx install \
-  "git+https://github.com/mauricemohr88-debug/hermes-plugin-guard.git@v0.2.1"
+  "git+https://github.com/mauricemohr88-debug/hermes-plugin-guard.git@v0.2.2"
 ```
 
 ## Why this exists
@@ -91,7 +91,7 @@ Alternatively, install reproducibly from the tagged GitHub source:
 
 ```bash
 pipx install \
-  "git+https://github.com/mauricemohr88-debug/hermes-plugin-guard.git@v0.2.1"
+  "git+https://github.com/mauricemohr88-debug/hermes-plugin-guard.git@v0.2.2"
 ```
 
 Or install from a local checkout:
@@ -240,6 +240,13 @@ deterministic for unchanged inputs.
 
 The repository includes a composite action:
 
+The action installs its own tagged source with Python 3.11, independently of Python
+dependency files in the consuming repository. Installation needs access to Python package
+indexes; the subsequent static scan does not make network requests. Self-hosted runners
+must meet the minimum runner version required by `actions/setup-python` v7 (2.327.1). The
+`github` format creates workflow annotations; selecting `sarif` prints a report but
+does not upload it to GitHub Code Scanning.
+
 ```yaml
 name: Plugin security
 
@@ -256,7 +263,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: mauricemohr88-debug/hermes-plugin-guard@v0.2.1
+      - uses: mauricemohr88-debug/hermes-plugin-guard@v0.2.2
         with:
           path: path/to/plugin
           fail-on: high

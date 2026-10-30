@@ -701,7 +701,8 @@ class _Analyzer(ast.NodeVisitor):
         if isinstance(node.value, str) and id(node) not in self.docstring_nodes:
             normalized = "/" + node.value.replace("\\", "/").lower().lstrip("/")
             match = next(
-                (part for part in SENSITIVE_PATH_PARTS if part in normalized),
+                # Stable first-match selection keeps report fingerprints consistent across runs.
+                (part for part in sorted(SENSITIVE_PATH_PARTS) if part in normalized),
                 None,
             )
             if match:

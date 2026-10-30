@@ -1,11 +1,40 @@
 from __future__ import annotations
 
 import json
+import os
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
 
 from hermes_plugin_guard.cli import main
+
+
+def test_json_is_deterministic_across_python_hash_seeds(risky_plugin: Path) -> None:
+    outputs = []
+    for seed in (0, 1, 2, 3):
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "hermes_plugin_guard",
+                "scan",
+                str(risky_plugin),
+                "--fail-on",
+                "none",
+                "--format",
+                "json",
+            ],
+            env={**os.environ, "PYTHONHASHSEED": str(seed)},
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        assert result.returncode == 0, result.stderr
+        outputs.append(result.stdout)
+
+    assert len(set(outputs)) == 1
 
 
 def test_clean_scan_returns_zero_and_prints_json(
