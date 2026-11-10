@@ -1,12 +1,17 @@
-# Hermes Plugin Guard
+<p align="center">
+  <img src="https://raw.githubusercontent.com/mauricemohr88-debug/hermes-plugin-guard/main/docs/social-card.svg" alt="Hermes Plugin Guard: review a Hermes Agent plugin before you enable it" width="100%">
+</p>
 
-[![CI](https://github.com/mauricemohr88-debug/hermes-plugin-guard/actions/workflows/ci.yml/badge.svg)](https://github.com/mauricemohr88-debug/hermes-plugin-guard/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-3776ab.svg)](pyproject.toml)
+<p align="center">
+  <a href="https://github.com/mauricemohr88-debug/hermes-plugin-guard/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/mauricemohr88-debug/hermes-plugin-guard/actions/workflows/ci.yml/badge.svg"></a>
+  <a href="https://pypi.org/project/hermes-plugin-guard/"><img alt="PyPI" src="https://img.shields.io/pypi/v/hermes-plugin-guard?style=flat-square&color=2fbf8f"></a>
+  <a href="https://github.com/mauricemohr88-debug/hermes-plugin-guard/blob/main/pyproject.toml"><img alt="Python 3.11+" src="https://img.shields.io/badge/python-3.11%2B-1f6f5c?style=flat-square"></a>
+  <img alt="Hermes Agent v0.20.5+" src="https://img.shields.io/badge/Hermes_Agent-v0.20.5%2B-0c1824?style=flat-square">
+  <img alt="target code never executed" src="https://img.shields.io/badge/target_code-never_executed-5ee0b5?style=flat-square">
+  <a href="https://github.com/mauricemohr88-debug/hermes-plugin-guard/blob/main/LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-073b2e?style=flat-square"></a>
+</p>
 
-![Hermes Plugin Guard social card](https://raw.githubusercontent.com/mauricemohr88-debug/hermes-plugin-guard/main/docs/social-card.svg)
-
-Review a Hermes Agent plugin before you enable it.
+<h3 align="center">Review a Hermes Agent plugin before you enable it.</h3>
 
 Hermes Plugin Guard (`hpg`) is a local static scanner for
 [NousResearch Hermes Agent](https://github.com/NousResearch/hermes-agent) plugins. It
